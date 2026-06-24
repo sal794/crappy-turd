@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Get-Content *)",
+      "PowerShell(Get-ChildItem *)",
+      "PowerShell(claude mcp *)",
+      "PowerShell(uvx *)",
+      "PowerShell(New-Item *)",
+      "mcp__coplay-mcp__*",
+      "PowerShell(pip show *)",
+      "Skill(update-config)",
+      "PowerShell(Get-Item \"C:\\\\Projects\\\\Crappy Turd 2000\\\\Builds\\\\CrappyTurd2000_WebGL.zip\" | Select-Object Name, @{N='SizeMB';E={[math]::Round\\($_.Length/1MB,1\\)}})",
+      "PowerShell(python --version; node --version)",
+      "PowerShell(Start-Process powershell -ArgumentList '-NoExit', '-Command', 'cd \"C:\\\\Projects\\\\Crappy Turd 2000\\\\Builds\\\\ct2000\"; python -m http.server 8000')",
+      "PowerShell(Rename-Item *)",
+      "PowerShell(\\(Get-Command git\\).Source)",
+      "PowerShell(git init *)",
+      "PowerShell(git add *)",
+      "PowerShell(git *)"
+    ]
+  }
+}
