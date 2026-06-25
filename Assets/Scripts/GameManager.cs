@@ -27,6 +27,14 @@ public class GameManager : MonoBehaviour
     private GameObject _settingsPanel;
     private GameObject _pauseButton;
     private GameObject _pausePanel;
+    private GameObject _accountPanel;
+    private GameObject _accountGuestPanel;
+    private GameObject _accountLoggedInPanel;
+    private GameObject _newNameButton;
+    private LegacyText _accountPanelTitle;
+    private LegacyText _accountLoggedInNameLabel;
+    private LegacyText _accountButtonLabel;
+    private LegacyText _accountStatusText;
     private LegacyText _scoreLabel;
     private LegacyText _highScoreLabel;
     private LegacyText _restartHintLabel;
@@ -49,6 +57,7 @@ public class GameManager : MonoBehaviour
     {
         if (Instance != null) { Destroy(gameObject); return; }
         Instance = this;
+        Debug.unityLogger.logHandler = new DeviceWarningFilter(Debug.unityLogger.logHandler);
         _audioSource = gameObject.AddComponent<AudioSource>();
         _audioSource.playOnAwake = false;
 
@@ -76,7 +85,10 @@ public class GameManager : MonoBehaviour
         CreatePausePanel();
 
         if (LeaderboardManager.Instance != null)
+        {
             LeaderboardManager.Instance.OnSessionReady += RefreshLeaderboard;
+            LeaderboardManager.Instance.OnAccountStateChanged += RefreshAccountUI;
+        }
 
         _musicSource.volume = PlayerPrefs.GetFloat(MusicVolumePrefKey, 0.35f);
         _audioSource.volume = PlayerPrefs.GetFloat(SFXVolumePrefKey, 1f);
@@ -332,6 +344,45 @@ public class GameManager : MonoBehaviour
         _pausePanel.SetActive(false);
     }
 
+    private void CreateTitleImage()
+    {
+        Sprite spr = Resources.Load<Sprite>("titlebetter");
+
+        GameObject go = new GameObject("TitleImage");
+        go.transform.SetParent(_startPanel.transform, false);
+        RectTransform rt = go.AddComponent<RectTransform>();
+        rt.anchorMin = new Vector2(0.5f, 0.5f);
+        rt.anchorMax = new Vector2(0.5f, 0.5f);
+        rt.pivot = new Vector2(0.5f, 0.5f);
+        rt.anchoredPosition = new Vector2(0f, 294f);
+
+        if (spr != null)
+        {
+            float maxW = 1430f;
+            float maxH = 437f;
+            float aspect = spr.rect.width / spr.rect.height;
+            float w = maxW;
+            float h = w / aspect;
+            if (h > maxH) { h = maxH; w = h * aspect; }
+            rt.sizeDelta = new Vector2(w, h);
+            Image img = go.AddComponent<Image>();
+            img.sprite = spr;
+            img.color = Color.white;
+            img.preserveAspect = true;
+        }
+        else
+        {
+            rt.sizeDelta = new Vector2(1000f, 150f);
+            LegacyText txt = go.AddComponent<LegacyText>();
+            txt.text = "Crappy Turd 2000";
+            txt.fontSize = 96;
+            txt.color = Color.white;
+            txt.fontStyle = FontStyle.Bold;
+            txt.alignment = TextAnchor.MiddleCenter;
+            txt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        }
+    }
+
     private void CreateStartUI()
     {
         Canvas canvas = FindFirstObjectByType<Canvas>();
@@ -346,13 +397,15 @@ public class GameManager : MonoBehaviour
         panelRt.offsetMin = Vector2.zero;
         panelRt.offsetMax = Vector2.zero;
 
-        MakeLabel(_startPanel.transform, "TitleText", "Crappy Turd 2000", 96, new Vector2(0f, 280f), new Vector2(1000f, 150f));
-        _startSubtitleLabel = MakeLabel(_startPanel.transform, "SubtitleText", GetStartHint(), 36, new Vector2(0f, -295f), new Vector2(900f, 80f));
+        CreateTitleImage();
+        _startSubtitleLabel = MakeLabel(_startPanel.transform, "SubtitleText", GetStartHint(), 36, new Vector2(0f, -365f), new Vector2(900f, 80f));
 
         CreateLeaderboardUI();
         CreateNamePickerUI();
         CreateSettingsButton();
         CreateSettingsPanel();
+        CreateAccountButton();
+        CreateAccountPanel();
     }
 
     private void CreateNamePickerUI()
@@ -367,7 +420,7 @@ public class GameManager : MonoBehaviour
         rowRt.anchorMax = new Vector2(0.5f, 0.5f);
         rowRt.pivot = new Vector2(0.5f, 0.5f);
         rowRt.sizeDelta = new Vector2(900f, 80f);
-        rowRt.anchoredPosition = new Vector2(0f, -200f);
+        rowRt.anchoredPosition = new Vector2(0f, -260f);
         Image bg = row.AddComponent<Image>();
         bg.color = new Color(0f, 0f, 0f, 0.92f);
 
@@ -399,7 +452,8 @@ public class GameManager : MonoBehaviour
         divImg.color = new Color(1f, 1f, 1f, 0.2f);
 
         // "New Name" button — right 32%, same dark family but slightly lighter on hover
-        GameObject btnGo = new GameObject("RerollButton");
+        _newNameButton = new GameObject("RerollButton");
+        GameObject btnGo = _newNameButton;
         btnGo.transform.SetParent(row.transform, false);
         RectTransform btnRt = btnGo.AddComponent<RectTransform>();
         btnRt.anchorMin = new Vector2(0.68f, 0f);
@@ -450,8 +504,8 @@ public class GameManager : MonoBehaviour
         rt.anchorMin = new Vector2(0.5f, 0.5f);
         rt.anchorMax = new Vector2(0.5f, 0.5f);
         rt.pivot = new Vector2(0.5f, 0.5f);
-        rt.sizeDelta = new Vector2(300f, 60f);
-        rt.anchoredPosition = new Vector2(0f, -385f);
+        rt.sizeDelta = new Vector2(260f, 60f);
+        rt.anchoredPosition = new Vector2(-150f, -455f);
 
         Image img = btnGo.AddComponent<Image>();
         img.color = new Color(0f, 0f, 0f, 0.92f);
@@ -746,6 +800,371 @@ public class GameManager : MonoBehaviour
         _settingsPanel.SetActive(false);
     }
 
+    private void CreateAccountButton()
+    {
+        GameObject btnGo = new GameObject("AccountButton");
+        btnGo.transform.SetParent(_startPanel.transform, false);
+        RectTransform rt = btnGo.AddComponent<RectTransform>();
+        rt.anchorMin = new Vector2(0.5f, 0.5f);
+        rt.anchorMax = new Vector2(0.5f, 0.5f);
+        rt.pivot = new Vector2(0.5f, 0.5f);
+        rt.sizeDelta = new Vector2(260f, 60f);
+        rt.anchoredPosition = new Vector2(150f, -455f);
+
+        Image img = btnGo.AddComponent<Image>();
+        img.color = new Color(0f, 0f, 0f, 0.92f);
+        Button btn = btnGo.AddComponent<Button>();
+        btn.targetGraphic = img;
+        ColorBlock colors = btn.colors;
+        colors.normalColor = Color.white;
+        colors.highlightedColor = new Color(0.85f, 0.85f, 0.85f, 1f);
+        colors.pressedColor = new Color(0.7f, 0.7f, 0.7f, 1f);
+        btn.colors = colors;
+        btn.onClick.AddListener(() => _accountPanel.SetActive(true));
+
+        GameObject textGo = new GameObject("Label");
+        textGo.transform.SetParent(btnGo.transform, false);
+        RectTransform textRt = textGo.AddComponent<RectTransform>();
+        textRt.anchorMin = Vector2.zero;
+        textRt.anchorMax = Vector2.one;
+        textRt.offsetMin = Vector2.zero;
+        textRt.offsetMax = Vector2.zero;
+        _accountButtonLabel = textGo.AddComponent<LegacyText>();
+        _accountButtonLabel.text = "Save Progress";
+        _accountButtonLabel.fontSize = 28;
+        _accountButtonLabel.color = Color.white;
+        _accountButtonLabel.fontStyle = FontStyle.Bold;
+        _accountButtonLabel.alignment = TextAnchor.MiddleCenter;
+        _accountButtonLabel.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+    }
+
+    private void CreateAccountPanel()
+    {
+        Canvas canvas = FindFirstObjectByType<Canvas>();
+        _accountPanel = new GameObject("AccountPanel");
+        _accountPanel.transform.SetParent(canvas.transform, false);
+
+        RectTransform overlayRt = _accountPanel.AddComponent<RectTransform>();
+        overlayRt.anchorMin = Vector2.zero;
+        overlayRt.anchorMax = Vector2.one;
+        overlayRt.offsetMin = Vector2.zero;
+        overlayRt.offsetMax = Vector2.zero;
+        Image overlayImg = _accountPanel.AddComponent<Image>();
+        overlayImg.color = new Color(0f, 0f, 0f, 0.82f);
+
+        // Center box — large enough to be comfortably tappable on mobile
+        GameObject box = new GameObject("Box");
+        box.transform.SetParent(_accountPanel.transform, false);
+        RectTransform boxRt = box.AddComponent<RectTransform>();
+        boxRt.anchorMin = new Vector2(0.5f, 0.5f);
+        boxRt.anchorMax = new Vector2(0.5f, 0.5f);
+        boxRt.pivot = new Vector2(0.5f, 0.5f);
+        boxRt.sizeDelta = new Vector2(820f, 560f);
+        boxRt.anchoredPosition = Vector2.zero;
+        Image boxImg = box.AddComponent<Image>();
+        boxImg.color = new Color(0.1f, 0.1f, 0.1f, 1f);
+
+        // Title
+        GameObject titleGo = new GameObject("Title");
+        titleGo.transform.SetParent(box.transform, false);
+        RectTransform titleRt = titleGo.AddComponent<RectTransform>();
+        titleRt.anchorMin = new Vector2(0f, 1f);
+        titleRt.anchorMax = new Vector2(1f, 1f);
+        titleRt.pivot = new Vector2(0.5f, 1f);
+        titleRt.sizeDelta = new Vector2(0f, 72f);
+        titleRt.anchoredPosition = Vector2.zero;
+        _accountPanelTitle = titleGo.AddComponent<LegacyText>();
+        _accountPanelTitle.fontSize = 42;
+        _accountPanelTitle.color = new Color(1f, 0.85f, 0.2f, 1f);
+        _accountPanelTitle.alignment = TextAnchor.MiddleCenter;
+        _accountPanelTitle.fontStyle = FontStyle.Bold;
+        _accountPanelTitle.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+
+        // Close button (always visible)
+        MakeSmallButton(box.transform, "Close", new Vector2(0f, 16f), new Vector2(240f, 65f),
+            new Color(0f, 0f, 0f, 0.92f), anchorBottom: true,
+            onClick: () => _accountPanel.SetActive(false));
+
+        // ---- Guest sub-panel ----
+        _accountGuestPanel = new GameObject("GuestPanel");
+        _accountGuestPanel.transform.SetParent(box.transform, false);
+        RectTransform guestRt = _accountGuestPanel.AddComponent<RectTransform>();
+        guestRt.anchorMin = Vector2.zero;
+        guestRt.anchorMax = Vector2.one;
+        guestRt.offsetMin = new Vector2(40f, 88f);
+        guestRt.offsetMax = new Vector2(-40f, -76f);
+
+        // Description
+        GameObject descGo = new GameObject("Desc");
+        descGo.transform.SetParent(_accountGuestPanel.transform, false);
+        RectTransform descRt = descGo.AddComponent<RectTransform>();
+        descRt.anchorMin = new Vector2(0f, 1f);
+        descRt.anchorMax = new Vector2(1f, 1f);
+        descRt.pivot = new Vector2(0.5f, 1f);
+        descRt.sizeDelta = new Vector2(0f, 60f);
+        descRt.anchoredPosition = Vector2.zero;
+        LegacyText descTxt = descGo.AddComponent<LegacyText>();
+        descTxt.text = "A username + PIN saves your scores across devices.\nGuests can still play — scores only save on this device.";
+        descTxt.fontSize = 22;
+        descTxt.color = new Color(0.72f, 0.72f, 0.72f, 1f);
+        descTxt.alignment = TextAnchor.MiddleCenter;
+        descTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+
+        // Username field
+        InputField usernameField = MakeInputField(_accountGuestPanel.transform, "Username (3–20 chars)", new Vector2(0f, -70f), new Vector2(0f, 70f));
+
+        // PIN field
+        InputField pinField = MakeInputField(_accountGuestPanel.transform, "4-digit PIN", new Vector2(0f, -150f), new Vector2(0f, 70f));
+        pinField.contentType = InputField.ContentType.Pin;
+        pinField.characterLimit = 4;
+
+        // Status / error text
+        GameObject statusGo = new GameObject("StatusText");
+        statusGo.transform.SetParent(_accountGuestPanel.transform, false);
+        RectTransform statusRt = statusGo.AddComponent<RectTransform>();
+        statusRt.anchorMin = new Vector2(0f, 1f);
+        statusRt.anchorMax = new Vector2(1f, 1f);
+        statusRt.pivot = new Vector2(0.5f, 1f);
+        statusRt.sizeDelta = new Vector2(0f, 32f);
+        statusRt.anchoredPosition = new Vector2(0f, -228f);
+        _accountStatusText = statusGo.AddComponent<LegacyText>();
+        _accountStatusText.fontSize = 22;
+        _accountStatusText.color = new Color(1f, 0.4f, 0.4f, 1f);
+        _accountStatusText.alignment = TextAnchor.MiddleCenter;
+        _accountStatusText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+
+        // Create Account button
+        MakeSmallButton(_accountGuestPanel.transform, "Create Account",
+            new Vector2(-150f, -270f), new Vector2(270f, 70f),
+            new Color(0.2f, 0.6f, 1f, 1f), anchorBottom: false,
+            onClick: () =>
+            {
+                string username = usernameField.text.Trim();
+                string pin = pinField.text.Trim();
+                if (username.Length < 3) { _accountStatusText.text = "Username must be at least 3 characters."; return; }
+                if (username.Length > 20) { _accountStatusText.text = "Username must be 20 characters or fewer."; return; }
+                if (pin.Length != 4 || !int.TryParse(pin, out _)) { _accountStatusText.text = "PIN must be exactly 4 digits."; return; }
+                _accountStatusText.text = "Creating account...";
+                _accountStatusText.color = new Color(0.72f, 0.72f, 0.72f, 1f);
+                LeaderboardManager.Instance?.CreateAccount(username, pin, (success, error) =>
+                {
+                    if (success) { _accountPanel.SetActive(false); RefreshAccountUI(); RefreshLeaderboard(); }
+                    else { _accountStatusText.text = error; _accountStatusText.color = new Color(1f, 0.4f, 0.4f, 1f); }
+                });
+            });
+
+        // Log In button
+        MakeSmallButton(_accountGuestPanel.transform, "Log In",
+            new Vector2(150f, -270f), new Vector2(270f, 70f),
+            new Color(0.15f, 0.15f, 0.15f, 1f), anchorBottom: false,
+            onClick: () =>
+            {
+                string username = usernameField.text.Trim();
+                string pin = pinField.text.Trim();
+                if (string.IsNullOrEmpty(username)) { _accountStatusText.text = "Enter your username."; return; }
+                if (pin.Length != 4 || !int.TryParse(pin, out _)) { _accountStatusText.text = "PIN must be exactly 4 digits."; return; }
+                _accountStatusText.text = "Logging in...";
+                _accountStatusText.color = new Color(0.72f, 0.72f, 0.72f, 1f);
+                LeaderboardManager.Instance?.Login(username, pin, (success, error) =>
+                {
+                    if (success) { _accountPanel.SetActive(false); RefreshAccountUI(); RefreshLeaderboard(); }
+                    else { _accountStatusText.text = error; _accountStatusText.color = new Color(1f, 0.4f, 0.4f, 1f); }
+                });
+            });
+
+        // ---- Logged-in sub-panel ----
+        _accountLoggedInPanel = new GameObject("LoggedInPanel");
+        _accountLoggedInPanel.transform.SetParent(box.transform, false);
+        RectTransform loggedInRt = _accountLoggedInPanel.AddComponent<RectTransform>();
+        loggedInRt.anchorMin = Vector2.zero;
+        loggedInRt.anchorMax = Vector2.one;
+        loggedInRt.offsetMin = new Vector2(40f, 88f);
+        loggedInRt.offsetMax = new Vector2(-40f, -76f);
+
+        // "Logged in as:" label
+        GameObject liLabelGo = new GameObject("LoggedInAs");
+        liLabelGo.transform.SetParent(_accountLoggedInPanel.transform, false);
+        RectTransform liLabelRt = liLabelGo.AddComponent<RectTransform>();
+        liLabelRt.anchorMin = new Vector2(0f, 1f);
+        liLabelRt.anchorMax = new Vector2(1f, 1f);
+        liLabelRt.pivot = new Vector2(0.5f, 1f);
+        liLabelRt.sizeDelta = new Vector2(0f, 44f);
+        liLabelRt.anchoredPosition = new Vector2(0f, -15f);
+        LegacyText liLabelTxt = liLabelGo.AddComponent<LegacyText>();
+        liLabelTxt.text = "Logged in as:";
+        liLabelTxt.fontSize = 30;
+        liLabelTxt.color = new Color(0.72f, 0.72f, 0.72f, 1f);
+        liLabelTxt.alignment = TextAnchor.MiddleCenter;
+        liLabelTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+
+        // Username in gold
+        GameObject liNameGo = new GameObject("LoggedInName");
+        liNameGo.transform.SetParent(_accountLoggedInPanel.transform, false);
+        RectTransform liNameRt = liNameGo.AddComponent<RectTransform>();
+        liNameRt.anchorMin = new Vector2(0f, 1f);
+        liNameRt.anchorMax = new Vector2(1f, 1f);
+        liNameRt.pivot = new Vector2(0.5f, 1f);
+        liNameRt.sizeDelta = new Vector2(0f, 80f);
+        liNameRt.anchoredPosition = new Vector2(0f, -64f);
+        _accountLoggedInNameLabel = liNameGo.AddComponent<LegacyText>();
+        _accountLoggedInNameLabel.fontSize = 56;
+        _accountLoggedInNameLabel.color = new Color(1f, 0.85f, 0.2f, 1f);
+        _accountLoggedInNameLabel.fontStyle = FontStyle.Bold;
+        _accountLoggedInNameLabel.alignment = TextAnchor.MiddleCenter;
+        _accountLoggedInNameLabel.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+
+        // Subtitle
+        GameObject liSubGo = new GameObject("LoggedInSub");
+        liSubGo.transform.SetParent(_accountLoggedInPanel.transform, false);
+        RectTransform liSubRt = liSubGo.AddComponent<RectTransform>();
+        liSubRt.anchorMin = new Vector2(0f, 1f);
+        liSubRt.anchorMax = new Vector2(1f, 1f);
+        liSubRt.pivot = new Vector2(0.5f, 1f);
+        liSubRt.sizeDelta = new Vector2(0f, 40f);
+        liSubRt.anchoredPosition = new Vector2(0f, -150f);
+        LegacyText liSubTxt = liSubGo.AddComponent<LegacyText>();
+        liSubTxt.text = "Your scores save across all devices.";
+        liSubTxt.fontSize = 26;
+        liSubTxt.color = new Color(0.72f, 0.72f, 0.72f, 1f);
+        liSubTxt.alignment = TextAnchor.MiddleCenter;
+        liSubTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+
+        // Log Out button
+        MakeSmallButton(_accountLoggedInPanel.transform, "Log Out",
+            new Vector2(0f, -205f), new Vector2(280f, 70f),
+            new Color(0.65f, 0.18f, 0.18f, 1f), anchorBottom: false,
+            onClick: () =>
+            {
+                LeaderboardManager.Instance?.Logout();
+                _accountPanel.SetActive(false);
+            });
+
+        RefreshAccountUI();
+        _accountPanel.SetActive(false);
+    }
+
+    private void RefreshAccountUI()
+    {
+        bool isGuest = LeaderboardManager.Instance == null || LeaderboardManager.Instance.IsGuest;
+        string name = LeaderboardManager.Instance != null ? LeaderboardManager.Instance.PlayerName : "...";
+
+        if (_playerNameLabel != null)
+            _playerNameLabel.text = "Playing as: " + name;
+        if (_newNameButton != null)
+            _newNameButton.SetActive(isGuest);
+        if (_accountButtonLabel != null)
+            _accountButtonLabel.text = isGuest ? "Save Progress" : "Account";
+        if (_accountPanelTitle != null)
+            _accountPanelTitle.text = isGuest ? "Save Your Progress" : "Account";
+        if (_accountGuestPanel != null)
+            _accountGuestPanel.SetActive(isGuest);
+        if (_accountLoggedInPanel != null)
+            _accountLoggedInPanel.SetActive(!isGuest);
+        if (_accountLoggedInNameLabel != null && !isGuest)
+            _accountLoggedInNameLabel.text = name;
+        if (_accountStatusText != null)
+            _accountStatusText.text = "";
+    }
+
+    private InputField MakeInputField(Transform parent, string placeholder, Vector2 anchoredPos, Vector2 sizeDelta)
+    {
+        GameObject go = new GameObject("InputField_" + placeholder);
+        go.transform.SetParent(parent, false);
+        RectTransform rt = go.AddComponent<RectTransform>();
+        rt.anchorMin = new Vector2(0f, 1f);
+        rt.anchorMax = new Vector2(1f, 1f);
+        rt.pivot = new Vector2(0.5f, 1f);
+        rt.sizeDelta = sizeDelta;
+        rt.anchoredPosition = anchoredPos;
+        Image bg = go.AddComponent<Image>();
+        bg.color = new Color(0.18f, 0.18f, 0.18f, 1f);
+
+        GameObject phGo = new GameObject("Placeholder");
+        phGo.transform.SetParent(go.transform, false);
+        RectTransform phRt = phGo.AddComponent<RectTransform>();
+        phRt.anchorMin = Vector2.zero;
+        phRt.anchorMax = Vector2.one;
+        phRt.offsetMin = new Vector2(12f, 4f);
+        phRt.offsetMax = new Vector2(-12f, -4f);
+        LegacyText phTxt = phGo.AddComponent<LegacyText>();
+        phTxt.text = placeholder;
+        phTxt.fontSize = 28;
+        phTxt.color = new Color(0.45f, 0.45f, 0.45f, 1f);
+        phTxt.fontStyle = FontStyle.Italic;
+        phTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+
+        GameObject textGo = new GameObject("Text");
+        textGo.transform.SetParent(go.transform, false);
+        RectTransform textRt = textGo.AddComponent<RectTransform>();
+        textRt.anchorMin = Vector2.zero;
+        textRt.anchorMax = Vector2.one;
+        textRt.offsetMin = new Vector2(12f, 4f);
+        textRt.offsetMax = new Vector2(-12f, -4f);
+        LegacyText txt = textGo.AddComponent<LegacyText>();
+        txt.fontSize = 28;
+        txt.color = Color.white;
+        txt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        txt.supportRichText = false;
+
+        InputField field = go.AddComponent<InputField>();
+        field.textComponent = txt;
+        field.placeholder = phTxt;
+        return field;
+    }
+
+    private void MakeSmallButton(Transform parent, string label, Vector2 anchoredPos, Vector2 size,
+        Color color, bool anchorBottom, System.Action onClick)
+    {
+        GameObject go = new GameObject(label + "Btn");
+        go.transform.SetParent(parent, false);
+        RectTransform rt = go.AddComponent<RectTransform>();
+        if (anchorBottom)
+        {
+            rt.anchorMin = new Vector2(0.5f, 0f);
+            rt.anchorMax = new Vector2(0.5f, 0f);
+            rt.pivot = new Vector2(0.5f, 0f);
+        }
+        else
+        {
+            rt.anchorMin = new Vector2(0.5f, 1f);
+            rt.anchorMax = new Vector2(0.5f, 1f);
+            rt.pivot = new Vector2(0.5f, 1f);
+        }
+        rt.sizeDelta = size;
+        rt.anchoredPosition = anchoredPos;
+
+        Image img = go.AddComponent<Image>();
+        img.color = color;
+        Button btn = go.AddComponent<Button>();
+        btn.targetGraphic = img;
+        ColorBlock colors = btn.colors;
+        colors.highlightedColor = new Color(
+            Mathf.Min(color.r + 0.15f, 1f),
+            Mathf.Min(color.g + 0.15f, 1f),
+            Mathf.Min(color.b + 0.15f, 1f), color.a);
+        colors.pressedColor = new Color(
+            Mathf.Max(color.r - 0.1f, 0f),
+            Mathf.Max(color.g - 0.1f, 0f),
+            Mathf.Max(color.b - 0.1f, 0f), color.a);
+        btn.colors = colors;
+        btn.onClick.AddListener(() => onClick?.Invoke());
+
+        GameObject textGo = new GameObject("Label");
+        textGo.transform.SetParent(go.transform, false);
+        RectTransform textRt = textGo.AddComponent<RectTransform>();
+        textRt.anchorMin = Vector2.zero;
+        textRt.anchorMax = Vector2.one;
+        textRt.offsetMin = Vector2.zero;
+        textRt.offsetMax = Vector2.zero;
+        LegacyText txt = textGo.AddComponent<LegacyText>();
+        txt.text = label;
+        txt.fontSize = 30;
+        txt.color = Color.white;
+        txt.fontStyle = FontStyle.Bold;
+        txt.alignment = TextAnchor.MiddleCenter;
+        txt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+    }
+
     private void CreateLeaderboardUI()
     {
         float rowHeight = 36f;
@@ -762,7 +1181,7 @@ public class GameManager : MonoBehaviour
         boardRt.anchorMax = new Vector2(0.5f, 0.5f);
         boardRt.pivot = new Vector2(0.5f, 0.5f);
         boardRt.sizeDelta = new Vector2(panelW, panelH);
-        boardRt.anchoredPosition = new Vector2(0f, 20f);
+        boardRt.anchoredPosition = new Vector2(667f, 100f);
         Image bg = board.AddComponent<Image>();
         bg.color = new Color(0f, 0f, 0f, 0.88f);
 
@@ -997,4 +1416,22 @@ public class GameManager : MonoBehaviour
         hintRt.pivot = new Vector2(0.5f, 0f);
         hintRt.anchoredPosition = new Vector2(0f, 20f);
     }
+}
+
+internal class DeviceWarningFilter : ILogHandler
+{
+    private readonly ILogHandler _inner;
+
+    internal DeviceWarningFilter(ILogHandler inner) { _inner = inner; }
+
+    public void LogFormat(LogType logType, UnityEngine.Object context, string format, params object[] args)
+    {
+        string msg = args.Length > 0 ? string.Format(format, args) : format;
+        if (msg.Contains("Could not create a device") || msg.Contains("has no matching layout"))
+            return;
+        _inner.LogFormat(logType, context, format, args);
+    }
+
+    public void LogException(System.Exception exception, UnityEngine.Object context)
+        => _inner.LogException(exception, context);
 }
