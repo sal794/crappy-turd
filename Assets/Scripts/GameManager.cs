@@ -21,6 +21,7 @@ public class GameManager : MonoBehaviour
     public bool IsPaused { get; private set; }
     public int Score { get; private set; }
     public int HighScore { get; private set; }
+    private const string HighScorePrefKey = "CT2000_HighScore";
     public float SpeedMultiplier { get; private set; } = 1f;
 
     private GameObject _startPanel;
@@ -35,6 +36,8 @@ public class GameManager : MonoBehaviour
     private GameObject _accountGuestPanel;
     private GameObject _accountLoggedInPanel;
     private GameObject _newNameButton;
+    private GameObject _namePickerDivider;
+    private RectTransform _playerNameLabelRt;
     private LegacyText _accountPanelTitle;
     private LegacyText _accountLoggedInNameLabel;
     private LegacyText _accountButtonLabel;
@@ -50,11 +53,32 @@ public class GameManager : MonoBehaviour
     private LegacyText _playerNameLabel;
     private AudioSource _audioSource;
     private AudioSource _musicSource;
+    private Font _gameFont;
 
     private const string MusicVolumePrefKey = "CT2000_MusicVolume";
     private const string SFXVolumePrefKey = "CT2000_SFXVolume";
 
     private const int LeaderboardDisplayCount = 8;
+
+    // Button color palette
+    private static readonly Color BtnBlue         = new Color(0.20f, 0.55f, 0.92f);
+    private static readonly Color BtnBlueBorder    = new Color(0.10f, 0.30f, 0.62f);
+    private static readonly Color BtnPurple        = new Color(0.62f, 0.22f, 0.85f);
+    private static readonly Color BtnPurpleBorder  = new Color(0.36f, 0.08f, 0.52f);
+    private static readonly Color BtnGreen         = new Color(0.18f, 0.72f, 0.30f);
+    private static readonly Color BtnGreenBorder   = new Color(0.08f, 0.44f, 0.16f);
+    private static readonly Color BtnOrange        = new Color(0.98f, 0.55f, 0.08f);
+    private static readonly Color BtnOrangeBorder  = new Color(0.66f, 0.34f, 0.02f);
+    private static readonly Color BtnRed           = new Color(0.88f, 0.20f, 0.16f);
+    private static readonly Color BtnRedBorder     = new Color(0.56f, 0.08f, 0.06f);
+    private static readonly Color BtnGold          = new Color(0.98f, 0.78f, 0.05f);
+    private static readonly Color BtnGoldBorder    = new Color(0.66f, 0.50f, 0.02f);
+    private static readonly Color BtnGray          = new Color(0.30f, 0.30f, 0.30f);
+    private static readonly Color BtnGrayBorder    = new Color(0.15f, 0.15f, 0.15f);
+    private static readonly Color BtnPink          = new Color(0.92f, 0.18f, 0.60f);
+    private static readonly Color BtnPinkBorder    = new Color(0.58f, 0.06f, 0.36f);
+    private static readonly Color BtnMagenta       = new Color(0.80f, 0.12f, 0.75f);
+    private static readonly Color BtnMagentaBorder = new Color(0.48f, 0.04f, 0.44f);
 
     private enum InputDevice { Keyboard, Xbox, PlayStation, Touch }
     private InputDevice _lastInputDevice = InputDevice.Keyboard;
@@ -73,8 +97,13 @@ public class GameManager : MonoBehaviour
         _musicSource.volume = 0.35f;
     }
 
+    private Font GetGameFont() =>
+        _gameFont != null ? _gameFont : GetGameFont();
+
     private void Start()
     {
+        _gameFont = Resources.Load<Font>("Fonts/Nosifer-Regular");
+        HighScore = PlayerPrefs.GetInt(HighScorePrefKey, 0);
         StyleGameOverUI();
 
         Transform btnT = gameOverPanel.transform.Find("RestartButton");
@@ -95,7 +124,10 @@ public class GameManager : MonoBehaviour
             LeaderboardManager.Instance.OnSessionReady += RefreshLeaderboard;
             LeaderboardManager.Instance.OnSessionReady += RefreshDailyLeaderboard;
             LeaderboardManager.Instance.OnSessionReady += () => SkinManager.Instance?.LoadUnlocksFromStorage();
+            LeaderboardManager.Instance.OnSessionReady += RefreshAccountUI;
+            LeaderboardManager.Instance.OnSessionReady += FetchLootLockerHighScore;
             LeaderboardManager.Instance.OnAccountStateChanged += RefreshAccountUI;
+            LeaderboardManager.Instance.OnAccountStateChanged += FetchLootLockerHighScore;
         }
         if (SkinManager.Instance != null)
         {
@@ -186,6 +218,21 @@ public class GameManager : MonoBehaviour
         if (_pauseButton != null) _pauseButton.SetActive(true);
     }
 
+    private void FetchLootLockerHighScore()
+    {
+        LeaderboardManager.Instance?.GetPlayerHighScore((remoteScore) =>
+        {
+            if (remoteScore > HighScore)
+            {
+                HighScore = remoteScore;
+                PlayerPrefs.SetInt(HighScorePrefKey, HighScore);
+                PlayerPrefs.Save();
+                if (_highScoreLabel != null)
+                    _highScoreLabel.text = $"High Score: {HighScore}";
+            }
+        });
+    }
+
     public void AddScore()
     {
         if (!IsStarted || IsGameOver) return;
@@ -195,6 +242,8 @@ public class GameManager : MonoBehaviour
         if (Score > HighScore)
         {
             HighScore = Score;
+            PlayerPrefs.SetInt(HighScorePrefKey, HighScore);
+            PlayerPrefs.Save();
             _highScoreLabel.text = $"High Score: {HighScore}";
         }
         SkinManager.Instance?.CheckScoreUnlock(Score);
@@ -299,7 +348,7 @@ public class GameManager : MonoBehaviour
         txt.color = Color.white;
         txt.fontStyle = FontStyle.Bold;
         txt.alignment = TextAnchor.MiddleCenter;
-        txt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        txt.font = GetGameFont();
 
         _pauseButton.SetActive(false);
     }
@@ -322,39 +371,9 @@ public class GameManager : MonoBehaviour
         LegacyText titleTxt = MakeLabel(_pausePanel.transform, "PauseTitle", "PAUSED", 72, new Vector2(0f, 80f), new Vector2(600f, 120f));
         titleTxt.color = new Color(1f, 0.85f, 0.2f, 1f);
 
-        // Resume button — same dark-box style
-        GameObject resumeGo = new GameObject("ResumeButton");
-        resumeGo.transform.SetParent(_pausePanel.transform, false);
-        RectTransform resumeRt = resumeGo.AddComponent<RectTransform>();
-        resumeRt.anchorMin = new Vector2(0.5f, 0.5f);
-        resumeRt.anchorMax = new Vector2(0.5f, 0.5f);
-        resumeRt.pivot = new Vector2(0.5f, 0.5f);
-        resumeRt.sizeDelta = new Vector2(360f, 80f);
-        resumeRt.anchoredPosition = new Vector2(0f, -60f);
-        Image resumeImg = resumeGo.AddComponent<Image>();
-        resumeImg.color = new Color(0f, 0f, 0f, 0.92f);
-        Button resumeBtn = resumeGo.AddComponent<Button>();
-        resumeBtn.targetGraphic = resumeImg;
-        ColorBlock resumeColors = resumeBtn.colors;
-        resumeColors.highlightedColor = new Color(0.15f, 0.15f, 0.15f, 1f);
-        resumeColors.pressedColor = new Color(0.3f, 0.3f, 0.3f, 1f);
-        resumeBtn.colors = resumeColors;
-        resumeBtn.onClick.AddListener(TogglePause);
-
-        GameObject resumeTxtGo = new GameObject("Label");
-        resumeTxtGo.transform.SetParent(resumeGo.transform, false);
-        RectTransform resumeTxtRt = resumeTxtGo.AddComponent<RectTransform>();
-        resumeTxtRt.anchorMin = Vector2.zero;
-        resumeTxtRt.anchorMax = Vector2.one;
-        resumeTxtRt.offsetMin = Vector2.zero;
-        resumeTxtRt.offsetMax = Vector2.zero;
-        LegacyText resumeTxt = resumeTxtGo.AddComponent<LegacyText>();
-        resumeTxt.text = "Resume";
-        resumeTxt.fontSize = 40;
-        resumeTxt.color = Color.white;
-        resumeTxt.fontStyle = FontStyle.Bold;
-        resumeTxt.alignment = TextAnchor.MiddleCenter;
-        resumeTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        // Resume button
+        MakeFancyButton(_pausePanel.transform, "Resume", new Vector2(0f, -60f),
+            new Vector2(360f, 80f), BtnOrange, BtnOrangeBorder, TogglePause, fontSize: 40);
 
         _pausePanel.SetActive(false);
     }
@@ -394,7 +413,7 @@ public class GameManager : MonoBehaviour
             txt.color = Color.white;
             txt.fontStyle = FontStyle.Bold;
             txt.alignment = TextAnchor.MiddleCenter;
-            txt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            txt.font = GetGameFont();
         }
     }
 
@@ -430,37 +449,52 @@ public class GameManager : MonoBehaviour
     {
         string currentName = LeaderboardManager.Instance != null ? LeaderboardManager.Instance.PlayerName : "...";
 
-        // Outer box — same dark style as start hint, centered, just above it
+        // Border layer
+        GameObject border = new GameObject("NamePickerBorder");
+        border.transform.SetParent(_startPanel.transform, false);
+        RectTransform borderRt = border.AddComponent<RectTransform>();
+        borderRt.anchorMin = new Vector2(0.5f, 0.5f);
+        borderRt.anchorMax = new Vector2(0.5f, 0.5f);
+        borderRt.pivot = new Vector2(0.5f, 0.5f);
+        borderRt.sizeDelta = new Vector2(910f, 90f);
+        borderRt.anchoredPosition = new Vector2(0f, -260f);
+        Image borderImg = border.AddComponent<Image>();
+        borderImg.color = BtnMagentaBorder;
+
+        // Face layer
         GameObject row = new GameObject("NamePicker");
-        row.transform.SetParent(_startPanel.transform, false);
+        row.transform.SetParent(border.transform, false);
         RectTransform rowRt = row.AddComponent<RectTransform>();
-        rowRt.anchorMin = new Vector2(0.5f, 0.5f);
-        rowRt.anchorMax = new Vector2(0.5f, 0.5f);
-        rowRt.pivot = new Vector2(0.5f, 0.5f);
-        rowRt.sizeDelta = new Vector2(900f, 80f);
-        rowRt.anchoredPosition = new Vector2(0f, -260f);
+        rowRt.anchorMin = Vector2.zero;
+        rowRt.anchorMax = Vector2.one;
+        rowRt.offsetMin = new Vector2(5f, 5f);
+        rowRt.offsetMax = new Vector2(-5f, -5f);
         Image bg = row.AddComponent<Image>();
-        bg.color = new Color(0f, 0f, 0f, 0.92f);
+        bg.color = BtnMagenta;
 
         // "Playing as: Name" — left 68%
         GameObject labelGo = new GameObject("NameLabel");
         labelGo.transform.SetParent(row.transform, false);
-        RectTransform labelRt = labelGo.AddComponent<RectTransform>();
-        labelRt.anchorMin = new Vector2(0f, 0f);
-        labelRt.anchorMax = new Vector2(0.68f, 1f);
-        labelRt.offsetMin = new Vector2(20f, 0f);
-        labelRt.offsetMax = Vector2.zero;
+        _playerNameLabelRt = labelGo.AddComponent<RectTransform>();
+        _playerNameLabelRt.anchorMin = new Vector2(0f, 0f);
+        _playerNameLabelRt.anchorMax = new Vector2(0.68f, 1f);
+        _playerNameLabelRt.offsetMin = new Vector2(20f, 0f);
+        _playerNameLabelRt.offsetMax = Vector2.zero;
         _playerNameLabel = labelGo.AddComponent<LegacyText>();
         _playerNameLabel.text = "Playing as: " + currentName;
         _playerNameLabel.fontSize = 32;
-        _playerNameLabel.color = Color.white;
+        _playerNameLabel.color = new Color(0.92f, 0.65f, 0.25f);
         _playerNameLabel.fontStyle = FontStyle.Bold;
         _playerNameLabel.alignment = TextAnchor.MiddleLeft;
-        _playerNameLabel.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        _playerNameLabel.font = GetGameFont();
         _playerNameLabel.resizeTextForBestFit = false;
+        Outline nameOutline = labelGo.AddComponent<Outline>();
+        nameOutline.effectColor    = new Color(0f, 0f, 0f, 0.6f);
+        nameOutline.effectDistance = new Vector2(2f, -2f);
 
         // Divider line
-        GameObject divGo = new GameObject("Divider");
+        _namePickerDivider = new GameObject("Divider");
+        GameObject divGo = _namePickerDivider;
         divGo.transform.SetParent(row.transform, false);
         RectTransform divRt = divGo.AddComponent<RectTransform>();
         divRt.anchorMin = new Vector2(0.68f, 0.15f);
@@ -507,49 +541,20 @@ public class GameManager : MonoBehaviour
         LegacyText btnText = btnTextGo.AddComponent<LegacyText>();
         btnText.text = "New Name";
         btnText.fontSize = 32;
-        btnText.color = new Color(0.7f, 0.88f, 1f, 1f);
+        btnText.color = new Color(0.92f, 0.65f, 0.25f);
         btnText.alignment = TextAnchor.MiddleCenter;
         btnText.fontStyle = FontStyle.Bold;
-        btnText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        btnText.font = GetGameFont();
+        Outline newNameOutline = btnTextGo.AddComponent<Outline>();
+        newNameOutline.effectColor    = new Color(0f, 0f, 0f, 0.6f);
+        newNameOutline.effectDistance = new Vector2(2f, -2f);
     }
 
     private void CreateSettingsButton()
     {
-        // Same dark-box style as start hint, centered below it
-        GameObject btnGo = new GameObject("SettingsButton");
-        btnGo.transform.SetParent(_startPanel.transform, false);
-        RectTransform rt = btnGo.AddComponent<RectTransform>();
-        rt.anchorMin = new Vector2(0.5f, 0.5f);
-        rt.anchorMax = new Vector2(0.5f, 0.5f);
-        rt.pivot = new Vector2(0.5f, 0.5f);
-        rt.sizeDelta = new Vector2(220f, 60f);
-        rt.anchoredPosition = new Vector2(-320f, -455f);
-
-        Image img = btnGo.AddComponent<Image>();
-        img.color = new Color(0f, 0f, 0f, 0.92f);
-        Button btn = btnGo.AddComponent<Button>();
-        btn.targetGraphic = img;
-        ColorBlock colors = btn.colors;
-        colors.normalColor = Color.white;
-        colors.highlightedColor = new Color(0.85f, 0.85f, 0.85f, 1f);
-        colors.pressedColor = new Color(0.7f, 0.7f, 0.7f, 1f);
-        btn.colors = colors;
-        btn.onClick.AddListener(() => _settingsPanel.SetActive(true));
-
-        GameObject textGo = new GameObject("Label");
-        textGo.transform.SetParent(btnGo.transform, false);
-        RectTransform textRt = textGo.AddComponent<RectTransform>();
-        textRt.anchorMin = Vector2.zero;
-        textRt.anchorMax = Vector2.one;
-        textRt.offsetMin = Vector2.zero;
-        textRt.offsetMax = Vector2.zero;
-        LegacyText txt = textGo.AddComponent<LegacyText>();
-        txt.text = "Settings";
-        txt.fontSize = 30;
-        txt.color = Color.white;
-        txt.fontStyle = FontStyle.Bold;
-        txt.alignment = TextAnchor.MiddleCenter;
-        txt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        MakeFancyButton(_startPanel.transform, "Settings", new Vector2(-320f, -455f),
+            new Vector2(210f, 60f), BtnBlue, BtnBlueBorder,
+            () => _settingsPanel.SetActive(true), fontSize: 30);
     }
 
     private void CreateSettingsPanel()
@@ -593,7 +598,7 @@ public class GameManager : MonoBehaviour
         titleTxt.color = new Color(1f, 0.85f, 0.2f, 1f);
         titleTxt.alignment = TextAnchor.MiddleCenter;
         titleTxt.fontStyle = FontStyle.Bold;
-        titleTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        titleTxt.font = GetGameFont();
 
         // Music Volume label
         GameObject volLabelGo = new GameObject("VolumeLabel");
@@ -610,7 +615,7 @@ public class GameManager : MonoBehaviour
         volLabelTxt.fontSize = 28;
         volLabelTxt.color = Color.white;
         volLabelTxt.alignment = TextAnchor.MiddleLeft;
-        volLabelTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        volLabelTxt.font = GetGameFont();
 
         // Slider
         int savedStep = Mathf.RoundToInt(PlayerPrefs.GetFloat(MusicVolumePrefKey, 0.35f) * 10f);
@@ -709,7 +714,7 @@ public class GameManager : MonoBehaviour
         sfxLabelTxt.fontSize = 28;
         sfxLabelTxt.color = Color.white;
         sfxLabelTxt.alignment = TextAnchor.MiddleLeft;
-        sfxLabelTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        sfxLabelTxt.font = GetGameFont();
 
         // Sound Effects slider
         GameObject sfxSliderGo = new GameObject("SFXSlider");
@@ -786,74 +791,19 @@ public class GameManager : MonoBehaviour
         });
 
         // Close button
-        GameObject closeBtnGo = new GameObject("CloseButton");
-        closeBtnGo.transform.SetParent(box.transform, false);
-        RectTransform closeBtnRt = closeBtnGo.AddComponent<RectTransform>();
-        closeBtnRt.anchorMin = new Vector2(0.5f, 0f);
-        closeBtnRt.anchorMax = new Vector2(0.5f, 0f);
-        closeBtnRt.pivot = new Vector2(0.5f, 0f);
-        closeBtnRt.sizeDelta = new Vector2(200f, 60f);
-        closeBtnRt.anchoredPosition = new Vector2(0f, 20f);
-        Image closeBtnImg = closeBtnGo.AddComponent<Image>();
-        closeBtnImg.color = new Color(0.2f, 0.6f, 1f, 1f);
-        Button closeBtn = closeBtnGo.AddComponent<Button>();
-        closeBtn.targetGraphic = closeBtnImg;
-        closeBtn.onClick.AddListener(() => _settingsPanel.SetActive(false));
-
-        GameObject closeTxtGo = new GameObject("Label");
-        closeTxtGo.transform.SetParent(closeBtnGo.transform, false);
-        RectTransform closeTxtRt = closeTxtGo.AddComponent<RectTransform>();
-        closeTxtRt.anchorMin = Vector2.zero;
-        closeTxtRt.anchorMax = Vector2.one;
-        closeTxtRt.offsetMin = Vector2.zero;
-        closeTxtRt.offsetMax = Vector2.zero;
-        LegacyText closeTxt = closeTxtGo.AddComponent<LegacyText>();
-        closeTxt.text = "Close";
-        closeTxt.fontSize = 30;
-        closeTxt.color = Color.white;
-        closeTxt.alignment = TextAnchor.MiddleCenter;
-        closeTxt.fontStyle = FontStyle.Bold;
-        closeTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        MakeFancyButton(box.transform, "Close", new Vector2(0f, 20f),
+            new Vector2(200f, 55f), BtnRed, BtnRedBorder,
+            () => _settingsPanel.SetActive(false),
+            new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), 28);
 
         _settingsPanel.SetActive(false);
     }
 
     private void CreateSkinsButton()
     {
-        GameObject btnGo = new GameObject("SkinsButton");
-        btnGo.transform.SetParent(_startPanel.transform, false);
-        RectTransform rt = btnGo.AddComponent<RectTransform>();
-        rt.anchorMin = new Vector2(0.5f, 0.5f);
-        rt.anchorMax = new Vector2(0.5f, 0.5f);
-        rt.pivot = new Vector2(0.5f, 0.5f);
-        rt.sizeDelta = new Vector2(220f, 60f);
-        rt.anchoredPosition = new Vector2(0f, -455f);
-
-        Image img = btnGo.AddComponent<Image>();
-        img.color = new Color(0f, 0f, 0f, 0.92f);
-        Button btn = btnGo.AddComponent<Button>();
-        btn.targetGraphic = img;
-        ColorBlock colors = btn.colors;
-        colors.normalColor = Color.white;
-        colors.highlightedColor = new Color(0.85f, 0.85f, 0.85f, 1f);
-        colors.pressedColor = new Color(0.7f, 0.7f, 0.7f, 1f);
-        btn.colors = colors;
-        btn.onClick.AddListener(() => { RefreshSkinsPanel(); _skinsPanel.SetActive(true); });
-
-        GameObject textGo = new GameObject("Label");
-        textGo.transform.SetParent(btnGo.transform, false);
-        RectTransform textRt = textGo.AddComponent<RectTransform>();
-        textRt.anchorMin = Vector2.zero;
-        textRt.anchorMax = Vector2.one;
-        textRt.offsetMin = Vector2.zero;
-        textRt.offsetMax = Vector2.zero;
-        LegacyText txt = textGo.AddComponent<LegacyText>();
-        txt.text = "Skins";
-        txt.fontSize = 30;
-        txt.color = Color.white;
-        txt.fontStyle = FontStyle.Bold;
-        txt.alignment = TextAnchor.MiddleCenter;
-        txt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        MakeFancyButton(_startPanel.transform, "Skins", new Vector2(0f, -455f),
+            new Vector2(210f, 60f), BtnPurple, BtnPurpleBorder,
+            () => { RefreshSkinsPanel(); _skinsPanel.SetActive(true); }, fontSize: 30);
     }
 
     private void CreateSkinsPanel()
@@ -897,7 +847,7 @@ public class GameManager : MonoBehaviour
         titleTxt.color = new Color(1f, 0.85f, 0.2f, 1f);
         titleTxt.fontStyle = FontStyle.Bold;
         titleTxt.alignment = TextAnchor.MiddleCenter;
-        titleTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        titleTxt.font = GetGameFont();
 
         // Build one card per skin
         int skinCount = SkinManager.AllSkins.Length;
@@ -962,7 +912,7 @@ public class GameManager : MonoBehaviour
             nameTxt.color = Color.white;
             nameTxt.fontStyle = FontStyle.Bold;
             nameTxt.alignment = TextAnchor.MiddleCenter;
-            nameTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            nameTxt.font = GetGameFont();
 
             // Status label (e.g. unlock hint for locked skins)
             GameObject hintGo = new GameObject("Hint");
@@ -977,75 +927,25 @@ public class GameManager : MonoBehaviour
             hintTxt.fontSize = 20;
             hintTxt.color = new Color(0.7f, 0.7f, 0.7f, 1f);
             hintTxt.alignment = TextAnchor.MiddleCenter;
-            hintTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            hintTxt.font = GetGameFont();
             _skinStatusLabels[i] = hintTxt;
 
             // Equip button
-            int capturedIndex = i;
             string capturedId = skin.Id;
-            GameObject btnGo = new GameObject("EquipBtn");
-            btnGo.transform.SetParent(card.transform, false);
-            RectTransform btnRt = btnGo.AddComponent<RectTransform>();
-            btnRt.anchorMin = new Vector2(0.5f, 1f);
-            btnRt.anchorMax = new Vector2(0.5f, 1f);
-            btnRt.pivot = new Vector2(0.5f, 1f);
-            btnRt.sizeDelta = new Vector2(200f, 56f);
-            btnRt.anchoredPosition = new Vector2(0f, -326f);
-            Image btnImg = btnGo.AddComponent<Image>();
-            Button btn = btnGo.AddComponent<Button>();
-            btn.targetGraphic = btnImg;
-            btn.onClick.AddListener(() => { SkinManager.Instance?.SetActiveSkin(capturedId); RefreshSkinsPanel(); });
+            Button btn = MakeFancyButton(card.transform, "Equip",
+                new Vector2(0f, -326f), new Vector2(190f, 50f),
+                BtnGreen, BtnGreenBorder,
+                () => { SkinManager.Instance?.SetActiveSkin(capturedId); RefreshSkinsPanel(); },
+                new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), 24);
             _skinEquipButtons[i] = btn;
-
-            GameObject btnLabel = new GameObject("Label");
-            btnLabel.transform.SetParent(btnGo.transform, false);
-            RectTransform btnLabelRt = btnLabel.AddComponent<RectTransform>();
-            btnLabelRt.anchorMin = Vector2.zero;
-            btnLabelRt.anchorMax = Vector2.one;
-            btnLabelRt.offsetMin = Vector2.zero;
-            btnLabelRt.offsetMax = Vector2.zero;
-            LegacyText btnTxt = btnLabel.AddComponent<LegacyText>();
-            btnTxt.fontSize = 26;
-            btnTxt.fontStyle = FontStyle.Bold;
-            btnTxt.alignment = TextAnchor.MiddleCenter;
-            btnTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            _skinStatusLabels[i] = btnTxt;
+            _skinStatusLabels[i] = btn.transform.Find("Label")?.GetComponent<LegacyText>();
         }
 
         // Close button
-        GameObject closeGo = new GameObject("CloseBtn");
-        closeGo.transform.SetParent(box.transform, false);
-        RectTransform closeRt = closeGo.AddComponent<RectTransform>();
-        closeRt.anchorMin = new Vector2(0.5f, 0f);
-        closeRt.anchorMax = new Vector2(0.5f, 0f);
-        closeRt.pivot = new Vector2(0.5f, 0f);
-        closeRt.sizeDelta = new Vector2(200f, 56f);
-        closeRt.anchoredPosition = new Vector2(0f, 20f);
-        Image closeImg = closeGo.AddComponent<Image>();
-        closeImg.color = new Color(0.25f, 0.25f, 0.25f, 1f);
-        Button closeBtn = closeGo.AddComponent<Button>();
-        closeBtn.targetGraphic = closeImg;
-        ColorBlock cc = closeBtn.colors;
-        cc.normalColor = Color.white;
-        cc.highlightedColor = new Color(0.85f, 0.85f, 0.85f, 1f);
-        cc.pressedColor = new Color(0.6f, 0.6f, 0.6f, 1f);
-        closeBtn.colors = cc;
-        closeBtn.onClick.AddListener(() => _skinsPanel.SetActive(false));
-
-        GameObject closeLbl = new GameObject("Label");
-        closeLbl.transform.SetParent(closeGo.transform, false);
-        RectTransform closeLblRt = closeLbl.AddComponent<RectTransform>();
-        closeLblRt.anchorMin = Vector2.zero;
-        closeLblRt.anchorMax = Vector2.one;
-        closeLblRt.offsetMin = Vector2.zero;
-        closeLblRt.offsetMax = Vector2.zero;
-        LegacyText closeTxt = closeLbl.AddComponent<LegacyText>();
-        closeTxt.text = "Close";
-        closeTxt.fontSize = 28;
-        closeTxt.color = Color.white;
-        closeTxt.fontStyle = FontStyle.Bold;
-        closeTxt.alignment = TextAnchor.MiddleCenter;
-        closeTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        MakeFancyButton(box.transform, "Close", new Vector2(0f, 20f),
+            new Vector2(200f, 52f), BtnRed, BtnRedBorder,
+            () => _skinsPanel.SetActive(false),
+            new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), 26);
 
         _skinsPanel.SetActive(false);
     }
@@ -1071,66 +971,43 @@ public class GameManager : MonoBehaviour
 
             border.color = equipped ? new Color(0.25f, 0.22f, 0.05f, 1f) : darkBg;
 
+            Image face = btn.GetComponent<Image>();
+            // Border sits on the parent of the face
+            Image borderImg = btn.transform.parent != null ? btn.transform.parent.GetComponent<Image>() : null;
+
             if (equipped)
             {
                 btn.interactable = false;
-                btn.GetComponent<Image>().color = gold;
+                if (face != null) face.color = BtnGold;
+                if (borderImg != null) borderImg.color = BtnGoldBorder;
                 lbl.text = "Equipped";
-                lbl.color = new Color(0.1f, 0.1f, 0.1f, 1f);
+                lbl.color = Color.white;
             }
             else if (unlocked)
             {
                 btn.interactable = true;
-                btn.GetComponent<Image>().color = new Color(0.25f, 0.25f, 0.25f, 1f);
+                if (face != null) face.color = BtnGreen;
+                if (borderImg != null) borderImg.color = BtnGreenBorder;
                 lbl.text = "Equip";
                 lbl.color = Color.white;
             }
             else
             {
                 btn.interactable = false;
-                btn.GetComponent<Image>().color = new Color(0.15f, 0.15f, 0.15f, 1f);
+                if (face != null) face.color = BtnGray;
+                if (borderImg != null) borderImg.color = BtnGrayBorder;
                 lbl.text = "Score 20+ to unlock";
-                lbl.color = new Color(0.55f, 0.55f, 0.55f, 1f);
+                lbl.color = new Color(0.75f, 0.75f, 0.75f, 1f);
             }
         }
     }
 
     private void CreateAccountButton()
     {
-        GameObject btnGo = new GameObject("AccountButton");
-        btnGo.transform.SetParent(_startPanel.transform, false);
-        RectTransform rt = btnGo.AddComponent<RectTransform>();
-        rt.anchorMin = new Vector2(0.5f, 0.5f);
-        rt.anchorMax = new Vector2(0.5f, 0.5f);
-        rt.pivot = new Vector2(0.5f, 0.5f);
-        rt.sizeDelta = new Vector2(220f, 60f);
-        rt.anchoredPosition = new Vector2(320f, -455f);
-
-        Image img = btnGo.AddComponent<Image>();
-        img.color = new Color(0f, 0f, 0f, 0.92f);
-        Button btn = btnGo.AddComponent<Button>();
-        btn.targetGraphic = img;
-        ColorBlock colors = btn.colors;
-        colors.normalColor = Color.white;
-        colors.highlightedColor = new Color(0.85f, 0.85f, 0.85f, 1f);
-        colors.pressedColor = new Color(0.7f, 0.7f, 0.7f, 1f);
-        btn.colors = colors;
-        btn.onClick.AddListener(() => _accountPanel.SetActive(true));
-
-        GameObject textGo = new GameObject("Label");
-        textGo.transform.SetParent(btnGo.transform, false);
-        RectTransform textRt = textGo.AddComponent<RectTransform>();
-        textRt.anchorMin = Vector2.zero;
-        textRt.anchorMax = Vector2.one;
-        textRt.offsetMin = Vector2.zero;
-        textRt.offsetMax = Vector2.zero;
-        _accountButtonLabel = textGo.AddComponent<LegacyText>();
-        _accountButtonLabel.text = "Save Progress";
-        _accountButtonLabel.fontSize = 28;
-        _accountButtonLabel.color = Color.white;
-        _accountButtonLabel.fontStyle = FontStyle.Bold;
-        _accountButtonLabel.alignment = TextAnchor.MiddleCenter;
-        _accountButtonLabel.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        Button btn = MakeFancyButton(_startPanel.transform, "Login", new Vector2(320f, -455f),
+            new Vector2(210f, 60f), BtnGreen, BtnGreenBorder,
+            () => _accountPanel.SetActive(true), fontSize: 26);
+        _accountButtonLabel = btn.transform.Find("Label")?.GetComponent<LegacyText>();
     }
 
     private void CreateAccountPanel()
@@ -1173,11 +1050,11 @@ public class GameManager : MonoBehaviour
         _accountPanelTitle.color = new Color(1f, 0.85f, 0.2f, 1f);
         _accountPanelTitle.alignment = TextAnchor.MiddleCenter;
         _accountPanelTitle.fontStyle = FontStyle.Bold;
-        _accountPanelTitle.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        _accountPanelTitle.font = GetGameFont();
 
         // Close button (always visible)
         MakeSmallButton(box.transform, "Close", new Vector2(0f, 16f), new Vector2(240f, 65f),
-            new Color(0f, 0f, 0f, 0.92f), anchorBottom: true,
+            BtnRed, anchorBottom: true,
             onClick: () => _accountPanel.SetActive(false));
 
         // ---- Guest sub-panel ----
@@ -1203,7 +1080,7 @@ public class GameManager : MonoBehaviour
         descTxt.fontSize = 22;
         descTxt.color = new Color(0.72f, 0.72f, 0.72f, 1f);
         descTxt.alignment = TextAnchor.MiddleCenter;
-        descTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        descTxt.font = GetGameFont();
 
         // Username field
         InputField usernameField = MakeInputField(_accountGuestPanel.transform, "Username (3–20 chars)", new Vector2(0f, -70f), new Vector2(0f, 70f));
@@ -1220,24 +1097,25 @@ public class GameManager : MonoBehaviour
         statusRt.anchorMin = new Vector2(0f, 1f);
         statusRt.anchorMax = new Vector2(1f, 1f);
         statusRt.pivot = new Vector2(0.5f, 1f);
-        statusRt.sizeDelta = new Vector2(0f, 32f);
+        statusRt.sizeDelta = new Vector2(0f, 52f);
         statusRt.anchoredPosition = new Vector2(0f, -228f);
         _accountStatusText = statusGo.AddComponent<LegacyText>();
-        _accountStatusText.fontSize = 22;
+        _accountStatusText.fontSize = 28;
         _accountStatusText.color = new Color(1f, 0.4f, 0.4f, 1f);
         _accountStatusText.alignment = TextAnchor.MiddleCenter;
         _accountStatusText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
 
         // Create Account button
         MakeSmallButton(_accountGuestPanel.transform, "Create Account",
-            new Vector2(-150f, -270f), new Vector2(270f, 70f),
-            new Color(0.2f, 0.6f, 1f, 1f), anchorBottom: false,
+            new Vector2(-150f, -298f), new Vector2(270f, 70f),
+            BtnBlue, anchorBottom: false,
             onClick: () =>
             {
                 string username = usernameField.text.Trim();
                 string pin = pinField.text.Trim();
                 if (username.Length < 3) { _accountStatusText.text = "Username must be at least 3 characters."; return; }
                 if (username.Length > 20) { _accountStatusText.text = "Username must be 20 characters or fewer."; return; }
+                if (ContainsProfanity(username)) { _accountStatusText.text = "That username isn't allowed. Try another."; return; }
                 if (pin.Length != 4 || !int.TryParse(pin, out _)) { _accountStatusText.text = "PIN must be exactly 4 digits."; return; }
                 _accountStatusText.text = "Creating account...";
                 _accountStatusText.color = new Color(0.72f, 0.72f, 0.72f, 1f);
@@ -1250,8 +1128,8 @@ public class GameManager : MonoBehaviour
 
         // Log In button
         MakeSmallButton(_accountGuestPanel.transform, "Log In",
-            new Vector2(150f, -270f), new Vector2(270f, 70f),
-            new Color(0.15f, 0.15f, 0.15f, 1f), anchorBottom: false,
+            new Vector2(150f, -298f), new Vector2(270f, 70f),
+            BtnOrange, anchorBottom: false,
             onClick: () =>
             {
                 string username = usernameField.text.Trim();
@@ -1290,7 +1168,7 @@ public class GameManager : MonoBehaviour
         liLabelTxt.fontSize = 30;
         liLabelTxt.color = new Color(0.72f, 0.72f, 0.72f, 1f);
         liLabelTxt.alignment = TextAnchor.MiddleCenter;
-        liLabelTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        liLabelTxt.font = GetGameFont();
 
         // Username in gold
         GameObject liNameGo = new GameObject("LoggedInName");
@@ -1306,7 +1184,7 @@ public class GameManager : MonoBehaviour
         _accountLoggedInNameLabel.color = new Color(1f, 0.85f, 0.2f, 1f);
         _accountLoggedInNameLabel.fontStyle = FontStyle.Bold;
         _accountLoggedInNameLabel.alignment = TextAnchor.MiddleCenter;
-        _accountLoggedInNameLabel.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        _accountLoggedInNameLabel.font = GetGameFont();
 
         // Subtitle
         GameObject liSubGo = new GameObject("LoggedInSub");
@@ -1322,12 +1200,12 @@ public class GameManager : MonoBehaviour
         liSubTxt.fontSize = 26;
         liSubTxt.color = new Color(0.72f, 0.72f, 0.72f, 1f);
         liSubTxt.alignment = TextAnchor.MiddleCenter;
-        liSubTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        liSubTxt.font = GetGameFont();
 
         // Log Out button
         MakeSmallButton(_accountLoggedInPanel.transform, "Log Out",
             new Vector2(0f, -205f), new Vector2(280f, 70f),
-            new Color(0.65f, 0.18f, 0.18f, 1f), anchorBottom: false,
+            BtnRed, anchorBottom: false,
             onClick: () =>
             {
                 LeaderboardManager.Instance?.Logout();
@@ -1344,11 +1222,25 @@ public class GameManager : MonoBehaviour
         string name = LeaderboardManager.Instance != null ? LeaderboardManager.Instance.PlayerName : "...";
 
         if (_playerNameLabel != null)
+        {
             _playerNameLabel.text = "Playing as: " + name;
+            _playerNameLabel.alignment = isGuest ? TextAnchor.MiddleLeft : TextAnchor.MiddleCenter;
+            _playerNameLabel.SetAllDirty();
+        }
         if (_newNameButton != null)
             _newNameButton.SetActive(isGuest);
+        if (_namePickerDivider != null)
+            _namePickerDivider.SetActive(isGuest);
+        if (_playerNameLabelRt != null)
+        {
+            _playerNameLabelRt.anchorMin = new Vector2(0f, 0f);
+            _playerNameLabelRt.anchorMax = isGuest ? new Vector2(0.68f, 1f) : new Vector2(1f, 1f);
+            _playerNameLabelRt.offsetMin = isGuest ? new Vector2(20f, 0f) : Vector2.zero;
+            _playerNameLabelRt.offsetMax = Vector2.zero;
+            LayoutRebuilder.ForceRebuildLayoutImmediate(_playerNameLabelRt);
+        }
         if (_accountButtonLabel != null)
-            _accountButtonLabel.text = isGuest ? "Save Progress" : "Account";
+            _accountButtonLabel.text = isGuest ? "Login" : "Account";
         if (_accountPanelTitle != null)
             _accountPanelTitle.text = isGuest ? "Save Your Progress" : "Account";
         if (_accountGuestPanel != null)
@@ -1359,6 +1251,28 @@ public class GameManager : MonoBehaviour
             _accountLoggedInNameLabel.text = name;
         if (_accountStatusText != null)
             _accountStatusText.text = "";
+    }
+
+    private static readonly string[] _blockedWords =
+    {
+        "nigger","nigga","faggot","faget","fagot","chink","spic","spick","kike","gook","wetback",
+        "tranny","retard","cunt","beaner","cracker","raghead","towelhead","sandnigger","zipperhead",
+        "dyke","troon","shemale","cripple","tard","mongoloid",
+        "hitler","nazi","kkk","nonce","pedo","pedophile","rapist",
+        "cum","cums","cumshot","cumslut","jizz","cock","cocks","cocksucker","dick","dicks","dickhead",
+        "pussy","pussies","tits","titties","boobs","boner","erection","penis","vagina","vulva",
+        "blowjob","handjob","rimjob","deepthroat","gangbang","orgy","threesome","creampie",
+        "hentai","pornhub","onlyfans","dildo","vibrator","fleshlight","buttplug","anal","anus",
+        "masturbat","foreskin","testicl","ballsack","nutsack","scrotum","clitoris","labia",
+        "slutty","whore","hooker","escort","stripper","camgirl","sexting","nudes","nude",
+    };
+
+    private static bool ContainsProfanity(string text)
+    {
+        string lower = text.ToLower();
+        foreach (string word in _blockedWords)
+            if (lower.Contains(word)) return true;
+        return false;
     }
 
     private InputField MakeInputField(Transform parent, string placeholder, Vector2 anchoredPos, Vector2 sizeDelta)
@@ -1407,57 +1321,98 @@ public class GameManager : MonoBehaviour
         return field;
     }
 
-    private void MakeSmallButton(Transform parent, string label, Vector2 anchoredPos, Vector2 size,
-        Color color, bool anchorBottom, System.Action onClick)
+    // Creates a colorful bordered button. Returns the face Image so callers can store a ref for color changes.
+    private Button MakeFancyButton(Transform parent, string label, Vector2 anchoredPos, Vector2 size,
+        Color faceColor, Color borderColor, System.Action onClick,
+        Vector2 anchorMin = default, Vector2 anchorMax = default, Vector2 pivot = default,
+        int fontSize = 32)
     {
-        GameObject go = new GameObject(label + "Btn");
-        go.transform.SetParent(parent, false);
-        RectTransform rt = go.AddComponent<RectTransform>();
-        if (anchorBottom)
-        {
-            rt.anchorMin = new Vector2(0.5f, 0f);
-            rt.anchorMax = new Vector2(0.5f, 0f);
-            rt.pivot = new Vector2(0.5f, 0f);
-        }
-        else
-        {
-            rt.anchorMin = new Vector2(0.5f, 1f);
-            rt.anchorMax = new Vector2(0.5f, 1f);
-            rt.pivot = new Vector2(0.5f, 1f);
-        }
-        rt.sizeDelta = size;
-        rt.anchoredPosition = anchoredPos;
+        // Default anchor = centre/centre
+        if (anchorMin == default) anchorMin = new Vector2(0.5f, 0.5f);
+        if (anchorMax == default) anchorMax = new Vector2(0.5f, 0.5f);
+        if (pivot    == default) pivot     = new Vector2(0.5f, 0.5f);
 
-        Image img = go.AddComponent<Image>();
-        img.color = color;
-        Button btn = go.AddComponent<Button>();
-        btn.targetGraphic = img;
-        ColorBlock colors = btn.colors;
-        colors.highlightedColor = new Color(
-            Mathf.Min(color.r + 0.15f, 1f),
-            Mathf.Min(color.g + 0.15f, 1f),
-            Mathf.Min(color.b + 0.15f, 1f), color.a);
-        colors.pressedColor = new Color(
-            Mathf.Max(color.r - 0.1f, 0f),
-            Mathf.Max(color.g - 0.1f, 0f),
-            Mathf.Max(color.b - 0.1f, 0f), color.a);
-        btn.colors = colors;
+        const float border = 5f;
+
+        // --- Border layer (slightly larger, darker) ---
+        GameObject borderGo = new GameObject(label + "Border");
+        borderGo.transform.SetParent(parent, false);
+        RectTransform borderRt = borderGo.AddComponent<RectTransform>();
+        borderRt.anchorMin = anchorMin;
+        borderRt.anchorMax = anchorMax;
+        borderRt.pivot     = pivot;
+        borderRt.sizeDelta = new Vector2(size.x + border * 2f, size.y + border * 2f);
+        borderRt.anchoredPosition = anchoredPos;
+        Image borderImg = borderGo.AddComponent<Image>();
+        borderImg.color = borderColor;
+
+        // --- Face layer ---
+        GameObject faceGo = new GameObject(label + "Face");
+        faceGo.transform.SetParent(borderGo.transform, false);
+        RectTransform faceRt = faceGo.AddComponent<RectTransform>();
+        faceRt.anchorMin = Vector2.zero;
+        faceRt.anchorMax = Vector2.one;
+        faceRt.offsetMin = new Vector2(border, border);
+        faceRt.offsetMax = new Vector2(-border, -border);
+        Image faceImg = faceGo.AddComponent<Image>();
+        faceImg.color = faceColor;
+
+        Button btn = faceGo.AddComponent<Button>();
+        btn.targetGraphic = faceImg;
+        ColorBlock cb = btn.colors;
+        cb.normalColor      = Color.white;
+        cb.highlightedColor = new Color(1f, 1f, 1f, 0.85f);
+        cb.pressedColor     = new Color(0.75f, 0.75f, 0.75f, 1f);
+        cb.selectedColor    = Color.white;
+        btn.colors = cb;
         btn.onClick.AddListener(() => onClick?.Invoke());
 
+        // --- Label ---
         GameObject textGo = new GameObject("Label");
-        textGo.transform.SetParent(go.transform, false);
+        textGo.transform.SetParent(faceGo.transform, false);
         RectTransform textRt = textGo.AddComponent<RectTransform>();
         textRt.anchorMin = Vector2.zero;
         textRt.anchorMax = Vector2.one;
         textRt.offsetMin = Vector2.zero;
         textRt.offsetMax = Vector2.zero;
         LegacyText txt = textGo.AddComponent<LegacyText>();
-        txt.text = label;
-        txt.fontSize = 30;
-        txt.color = Color.white;
+        txt.text      = label;
+        txt.fontSize  = fontSize;
+        txt.color     = new Color(0.92f, 0.65f, 0.25f);
         txt.fontStyle = FontStyle.Bold;
         txt.alignment = TextAnchor.MiddleCenter;
-        txt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        txt.font      = GetGameFont();
+
+        Outline outline = textGo.AddComponent<Outline>();
+        outline.effectColor    = new Color(0f, 0f, 0f, 0.6f);
+        outline.effectDistance = new Vector2(2f, -2f);
+
+        return btn;
+    }
+
+    private void MakeSmallButton(Transform parent, string label, Vector2 anchoredPos, Vector2 size,
+        Color faceColor, bool anchorBottom, System.Action onClick)
+    {
+        Vector2 aMin, aMax, piv;
+        if (anchorBottom)
+        {
+            aMin = new Vector2(0.5f, 0f);
+            aMax = new Vector2(0.5f, 0f);
+            piv  = new Vector2(0.5f, 0f);
+        }
+        else
+        {
+            aMin = new Vector2(0.5f, 1f);
+            aMax = new Vector2(0.5f, 1f);
+            piv  = new Vector2(0.5f, 1f);
+        }
+
+        Color borderColor = new Color(
+            Mathf.Max(faceColor.r - 0.25f, 0f),
+            Mathf.Max(faceColor.g - 0.25f, 0f),
+            Mathf.Max(faceColor.b - 0.25f, 0f));
+        MakeFancyButton(parent, label, anchoredPos, size, faceColor, borderColor, onClick,
+            aMin, aMax, piv, 28);
     }
 
     private void CreateLeaderboardUI()
@@ -1696,23 +1651,39 @@ public class GameManager : MonoBehaviour
         hgo.SetActive(false);
     }
 
-    private LegacyText MakeLabel(Transform parent, string name, string content, int fontSize, Vector2 anchoredPos, Vector2 size)
+    private LegacyText MakeLabel(Transform parent, string name, string content, int fontSize,
+        Vector2 anchoredPos, Vector2 size)
     {
-        // Container holds the dark background box
+        const float border = 5f;
+        Color faceColor   = BtnPink;
+        Color borderColor = BtnPinkBorder;
+
+        // Border layer
         GameObject go = new GameObject(name);
         go.transform.SetParent(parent, false);
         RectTransform rt = go.AddComponent<RectTransform>();
         rt.anchorMin = new Vector2(0.5f, 0.5f);
         rt.anchorMax = new Vector2(0.5f, 0.5f);
         rt.pivot = new Vector2(0.5f, 0.5f);
-        rt.sizeDelta = size;
+        rt.sizeDelta = new Vector2(size.x + border * 2f, size.y + border * 2f);
         rt.anchoredPosition = anchoredPos;
-        Image bg = go.AddComponent<Image>();
-        bg.color = new Color(0f, 0f, 0f, 0.92f);
+        Image borderImg = go.AddComponent<Image>();
+        borderImg.color = borderColor;
 
-        // Text is a child so it renders on top of the background
+        // Face layer
+        GameObject faceGo = new GameObject("Face");
+        faceGo.transform.SetParent(go.transform, false);
+        RectTransform faceRt = faceGo.AddComponent<RectTransform>();
+        faceRt.anchorMin = Vector2.zero;
+        faceRt.anchorMax = Vector2.one;
+        faceRt.offsetMin = new Vector2(border, border);
+        faceRt.offsetMax = new Vector2(-border, -border);
+        Image faceImg = faceGo.AddComponent<Image>();
+        faceImg.color = faceColor;
+
+        // Text on top of face
         GameObject textGo = new GameObject("Label");
-        textGo.transform.SetParent(go.transform, false);
+        textGo.transform.SetParent(faceGo.transform, false);
         RectTransform textRt = textGo.AddComponent<RectTransform>();
         textRt.anchorMin = Vector2.zero;
         textRt.anchorMax = Vector2.one;
@@ -1721,11 +1692,14 @@ public class GameManager : MonoBehaviour
         LegacyText txt = textGo.AddComponent<LegacyText>();
         txt.text = content;
         txt.fontSize = fontSize;
-        txt.color = Color.white;
+        txt.color = new Color(0.92f, 0.65f, 0.25f);
         txt.alignment = TextAnchor.MiddleCenter;
         txt.fontStyle = FontStyle.Bold;
-        txt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        txt.font = GetGameFont();
         txt.resizeTextForBestFit = false;
+        Outline lblOutline = textGo.AddComponent<Outline>();
+        lblOutline.effectColor    = new Color(0f, 0f, 0f, 0.6f);
+        lblOutline.effectDistance = new Vector2(2f, -2f);
         return txt;
     }
 
@@ -1795,9 +1769,11 @@ public class GameManager : MonoBehaviour
         // Restart hint — same dark-box style as start screen subtitle
         _restartHintLabel = MakeLabel(gameOverPanel.transform, "RestartHint", GetRestartHint(), 28, new Vector2(0f, 20f), new Vector2(900f, 60f));
         // Pin to bottom of panel, outside the VLG stack
-        LayoutElement hintLE = _restartHintLabel.transform.parent.gameObject.AddComponent<LayoutElement>();
+        // MakeLabel hierarchy: border (direct child of panel) → face → textGo; go up two levels
+        GameObject hintBorder = _restartHintLabel.transform.parent.parent.gameObject;
+        LayoutElement hintLE = hintBorder.AddComponent<LayoutElement>();
         hintLE.ignoreLayout = true;
-        RectTransform hintRt = _restartHintLabel.transform.parent.GetComponent<RectTransform>();
+        RectTransform hintRt = hintBorder.GetComponent<RectTransform>();
         hintRt.anchorMin = new Vector2(0.5f, 0f);
         hintRt.anchorMax = new Vector2(0.5f, 0f);
         hintRt.pivot = new Vector2(0.5f, 0f);

@@ -17,6 +17,7 @@ public class LeaderboardManager : MonoBehaviour
     public bool SessionActive { get; private set; }
     public bool IsGuest { get; private set; } = true;
     public string PlayerName { get; private set; }
+    public string PlayerId { get; private set; }
 
     public event System.Action OnSessionReady;
     public event System.Action OnAccountStateChanged;
@@ -61,17 +62,8 @@ public class LeaderboardManager : MonoBehaviour
         {
             if (!response.success) { Debug.LogWarning("Guest session failed: " + response.text); return; }
             SessionActive = true;
-            FindUniqueName(PlayerName, 8, (uniqueName) =>
-            {
-                if (uniqueName != PlayerName)
-                {
-                    PlayerName = uniqueName;
-                    PlayerPrefs.SetString(GuestNamePrefKey, PlayerName);
-                    PlayerPrefs.Save();
-                }
-                LootLockerSDKManager.SetPlayerName(PlayerName, (_) => { });
-                OnSessionReady?.Invoke();
-            });
+            PlayerId = response.player_id.ToString();
+            OnSessionReady?.Invoke();
         });
     }
 
@@ -86,6 +78,7 @@ public class LeaderboardManager : MonoBehaviour
                 IsGuest = false;
                 PlayerName = PlayerPrefs.GetString(AccountDisplayNamePrefKey, "Player");
                 SessionActive = true;
+                PlayerId = sessionResp.player_id.ToString();
                 OnSessionReady?.Invoke();
             });
         });
@@ -112,6 +105,7 @@ public class LeaderboardManager : MonoBehaviour
                     PlayerName = username;
                     SaveAccountPrefs(email, password, username);
                     SessionActive = true;
+                    PlayerId = sessionResp.player_id.ToString();
                     LootLockerSDKManager.SetPlayerName(username, (_) => { });
                     OnAccountStateChanged?.Invoke();
                     OnSessionReady?.Invoke();
@@ -138,6 +132,7 @@ public class LeaderboardManager : MonoBehaviour
                 PlayerName = username;
                 SaveAccountPrefs(email, password, username);
                 SessionActive = true;
+                PlayerId = sessionResp.player_id.ToString();
                 LootLockerSDKManager.SetPlayerName(username, (_) => { });
                 OnAccountStateChanged?.Invoke();
                 OnSessionReady?.Invoke();
@@ -157,6 +152,15 @@ public class LeaderboardManager : MonoBehaviour
         PlayerName = PlayerPrefs.GetString(GuestNamePrefKey);
         OnAccountStateChanged?.Invoke();
         StartGuestSession();
+    }
+
+    public void GetPlayerHighScore(System.Action<int> onComplete)
+    {
+        if (!SessionActive || string.IsNullOrEmpty(PlayerId)) { onComplete?.Invoke(0); return; }
+        LootLockerSDKManager.GetMemberRank(LeaderboardKey, PlayerId, (response) =>
+        {
+            onComplete?.Invoke(response.success ? response.score : 0);
+        });
     }
 
     public void SubmitScore(int score, System.Action onComplete = null)
@@ -207,7 +211,7 @@ public class LeaderboardManager : MonoBehaviour
             PlayerName = uniqueName;
             PlayerPrefs.SetString(GuestNamePrefKey, PlayerName);
             PlayerPrefs.Save();
-            LootLockerSDKManager.SetPlayerName(PlayerName, (_) => onComplete?.Invoke(PlayerName));
+            onComplete?.Invoke(PlayerName);
         });
     }
 
