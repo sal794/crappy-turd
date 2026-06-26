@@ -90,6 +90,7 @@ public class GameManager : MonoBehaviour
         {
             LeaderboardManager.Instance.OnSessionReady += RefreshLeaderboard;
             LeaderboardManager.Instance.OnSessionReady += RefreshDailyLeaderboard;
+            LeaderboardManager.Instance.OnSessionReady += () => SkinManager.Instance?.LoadUnlocksFromStorage();
             LeaderboardManager.Instance.OnAccountStateChanged += RefreshAccountUI;
         }
 
@@ -187,6 +188,7 @@ public class GameManager : MonoBehaviour
             HighScore = Score;
             _highScoreLabel.text = $"High Score: {HighScore}";
         }
+        SkinManager.Instance?.CheckScoreUnlock(Score);
         PlayRandomScoreSound();
     }
 

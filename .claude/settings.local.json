@@ -16,7 +16,10 @@
       "PowerShell(\\(Get-Command git\\).Source)",
       "PowerShell(git init *)",
       "PowerShell(git add *)",
-      "PowerShell(git *)"
+      "PowerShell(git *)",
+      "PowerShell(git commit *)",
+      "PowerShell(git push *)",
+      "PowerShell(git pull *)"
     ]
   }
 }

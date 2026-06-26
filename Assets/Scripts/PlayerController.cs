@@ -8,6 +8,7 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private float leanSpeed = 8f;
 
     private Rigidbody2D _rb;
+    private SpriteRenderer _sr;
     private float _halfPlayerHeight;
     private float _bottomBound;
     private float _topBound;
@@ -16,10 +17,15 @@ public class PlayerController : MonoBehaviour
     private void Awake()
     {
         _rb = GetComponent<Rigidbody2D>();
+        _sr = GetComponent<SpriteRenderer>();
     }
 
     private void Start()
     {
+        ApplyActiveSkin();
+        if (SkinManager.Instance != null)
+            SkinManager.Instance.OnSkinChanged += ApplyActiveSkin;
+
         _halfPlayerHeight = GetComponent<Collider2D>().bounds.extents.y;
         Camera cam = Camera.main;
         _bottomBound = cam.transform.position.y - cam.orthographicSize - _halfPlayerHeight;
@@ -91,6 +97,19 @@ public class PlayerController : MonoBehaviour
         // Reset vertical velocity so each tap feels consistent regardless of fall speed
         _rb.linearVelocity = new Vector2(0f, 0f);
         _rb.AddForce(Vector2.up * jumpForce, ForceMode2D.Impulse);
+    }
+
+    private void OnDestroy()
+    {
+        if (SkinManager.Instance != null)
+            SkinManager.Instance.OnSkinChanged -= ApplyActiveSkin;
+    }
+
+    private void ApplyActiveSkin()
+    {
+        if (_sr == null || SkinManager.Instance == null) return;
+        Sprite s = SkinManager.Instance.LoadActiveSkinSprite();
+        if (s != null) _sr.sprite = s;
     }
 
     private void OnCollisionEnter2D(Collision2D collision)
