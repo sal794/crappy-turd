@@ -877,7 +877,7 @@ public class GameManager : MonoBehaviour
         boxRt.anchorMin = new Vector2(0.5f, 0.5f);
         boxRt.anchorMax = new Vector2(0.5f, 0.5f);
         boxRt.pivot = new Vector2(0.5f, 0.5f);
-        boxRt.sizeDelta = new Vector2(800f, 520f);
+        boxRt.sizeDelta = new Vector2(800f, 580f);
         boxRt.anchoredPosition = Vector2.zero;
         Image boxImg = box.AddComponent<Image>();
         boxImg.color = new Color(0.1f, 0.1f, 0.1f, 1f);
@@ -924,7 +924,7 @@ public class GameManager : MonoBehaviour
             cardRt.anchorMax = new Vector2(0.5f, 0.5f);
             cardRt.pivot = new Vector2(0.5f, 0.5f);
             cardRt.sizeDelta = new Vector2(cardW, cardH);
-            cardRt.anchoredPosition = new Vector2(cardX, -20f);
+            cardRt.anchoredPosition = new Vector2(cardX, -10f);
             Image cardImg = card.AddComponent<Image>();
             cardImg.color = new Color(0.18f, 0.18f, 0.18f, 1f);
             _skinCardBorders[i] = cardImg;

@@ -9,6 +9,8 @@ public class PlayerController : MonoBehaviour
 
     private Rigidbody2D _rb;
     private SpriteRenderer _sr;
+    private Vector3 _originalScale;
+    private Vector2 _baseSpriteSize;
     private float _halfPlayerHeight;
     private float _bottomBound;
     private float _topBound;
@@ -18,6 +20,13 @@ public class PlayerController : MonoBehaviour
     {
         _rb = GetComponent<Rigidbody2D>();
         _sr = GetComponent<SpriteRenderer>();
+
+        // Capture original transform scale (set in scene for Mr. Crappy) before any skin override
+        _originalScale = transform.localScale;
+
+        Sprite baseSpr = Resources.Load<Sprite>("Skins/turd2000");
+        if (baseSpr != null)
+            _baseSpriteSize = baseSpr.bounds.size;
     }
 
     private void Start()
@@ -109,7 +118,16 @@ public class PlayerController : MonoBehaviour
     {
         if (_sr == null || SkinManager.Instance == null) return;
         Sprite s = SkinManager.Instance.LoadActiveSkinSprite();
-        if (s != null) _sr.sprite = s;
+        if (s == null) return;
+        _sr.sprite = s;
+
+        if (_baseSpriteSize.x > 0 && s.bounds.size.x > 0)
+        {
+            transform.localScale = new Vector3(
+                _originalScale.x * (_baseSpriteSize.x / s.bounds.size.x),
+                _originalScale.y * (_baseSpriteSize.y / s.bounds.size.y),
+                _originalScale.z);
+        }
     }
 
     private void OnCollisionEnter2D(Collision2D collision)

@@ -1,12 +1,14 @@
 using UnityEngine;
 using LootLocker.Requests;
 using System.Collections.Generic;
+using System;
 
 public class SkinManager : MonoBehaviour
 {
     public static SkinManager Instance { get; private set; }
 
     private const string ActiveSkinPrefKey = "CT2000_ActiveSkin";
+    private const string UnlockedSkinsPrefKey = "CT2000_UnlockedSkins";
     private const int ScoreUnlockThreshold = 20;
 
     public class SkinDefinition
@@ -34,7 +36,15 @@ public class SkinManager : MonoBehaviour
         if (Instance != null) { Destroy(gameObject); return; }
         Instance = this;
         DontDestroyOnLoad(gameObject);
+
+        // Restore unlocks from local cache immediately so the skin is available before LootLocker responds
+        string saved = PlayerPrefs.GetString(UnlockedSkinsPrefKey, "");
+        if (!string.IsNullOrEmpty(saved))
+            foreach (string id in saved.Split(','))
+                if (!string.IsNullOrEmpty(id)) _unlocked.Add(id);
+
         ActiveSkinId = PlayerPrefs.GetString(ActiveSkinPrefKey, "mr_crappy");
+        if (!IsUnlocked(ActiveSkinId)) ActiveSkinId = "mr_crappy";
     }
 
     public void LoadUnlocksFromStorage()
@@ -61,6 +71,7 @@ public class SkinManager : MonoBehaviour
     {
         if (_unlocked.Contains(skinId)) { onComplete?.Invoke(); return; }
         _unlocked.Add(skinId);
+        SaveUnlocksToPrefs();
         OnUnlockChanged?.Invoke();
         LootLockerSDKManager.UpdateOrCreateKeyValue("skin_" + skinId, "true", (response) =>
         {
@@ -68,6 +79,12 @@ public class SkinManager : MonoBehaviour
                 Debug.LogWarning("SkinManager: failed to persist unlock for " + skinId);
             onComplete?.Invoke();
         });
+    }
+
+    private void SaveUnlocksToPrefs()
+    {
+        PlayerPrefs.SetString(UnlockedSkinsPrefKey, string.Join(",", _unlocked));
+        PlayerPrefs.Save();
     }
 
     public void SetActiveSkin(string skinId)
@@ -82,7 +99,7 @@ public class SkinManager : MonoBehaviour
     public void CheckScoreUnlock(int score)
     {
         if (score > ScoreUnlockThreshold && !IsUnlocked("the_kernel"))
-            Unlock("the_kernel", () => SetActiveSkin("the_kernel"));
+            Unlock("the_kernel");
     }
 
     public Sprite LoadActiveSkinSprite()
