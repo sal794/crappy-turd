@@ -41,6 +41,8 @@ public class GameManager : MonoBehaviour
     private LegacyText _startSubtitleLabel;
     private LegacyText _leaderboardTitle;
     private LegacyText[] _leaderboardRows;
+    private LegacyText _dailyLeaderboardTitle;
+    private LegacyText[] _dailyLeaderboardRows;
     private LegacyText _playerNameLabel;
     private AudioSource _audioSource;
     private AudioSource _musicSource;
@@ -87,6 +89,7 @@ public class GameManager : MonoBehaviour
         if (LeaderboardManager.Instance != null)
         {
             LeaderboardManager.Instance.OnSessionReady += RefreshLeaderboard;
+            LeaderboardManager.Instance.OnSessionReady += RefreshDailyLeaderboard;
             LeaderboardManager.Instance.OnAccountStateChanged += RefreshAccountUI;
         }
 
@@ -238,6 +241,7 @@ public class GameManager : MonoBehaviour
         _startPanel.SetActive(true);
         if (_pauseButton != null) _pauseButton.SetActive(false);
         RefreshLeaderboard();
+        RefreshDailyLeaderboard();
     }
 
     public void TogglePause()
@@ -401,6 +405,7 @@ public class GameManager : MonoBehaviour
         _startSubtitleLabel = MakeLabel(_startPanel.transform, "SubtitleText", GetStartHint(), 36, new Vector2(0f, -365f), new Vector2(900f, 80f));
 
         CreateLeaderboardUI();
+        CreateDailyLeaderboardUI();
         CreateNamePickerUI();
         CreateSettingsButton();
         CreateSettingsPanel();
@@ -948,7 +953,7 @@ public class GameManager : MonoBehaviour
                 _accountStatusText.color = new Color(0.72f, 0.72f, 0.72f, 1f);
                 LeaderboardManager.Instance?.CreateAccount(username, pin, (success, error) =>
                 {
-                    if (success) { _accountPanel.SetActive(false); RefreshAccountUI(); RefreshLeaderboard(); }
+                    if (success) { _accountPanel.SetActive(false); RefreshAccountUI(); RefreshLeaderboard(); RefreshDailyLeaderboard(); }
                     else { _accountStatusText.text = error; _accountStatusText.color = new Color(1f, 0.4f, 0.4f, 1f); }
                 });
             });
@@ -967,7 +972,7 @@ public class GameManager : MonoBehaviour
                 _accountStatusText.color = new Color(0.72f, 0.72f, 0.72f, 1f);
                 LeaderboardManager.Instance?.Login(username, pin, (success, error) =>
                 {
-                    if (success) { _accountPanel.SetActive(false); RefreshAccountUI(); RefreshLeaderboard(); }
+                    if (success) { _accountPanel.SetActive(false); RefreshAccountUI(); RefreshLeaderboard(); RefreshDailyLeaderboard(); }
                     else { _accountStatusText.text = error; _accountStatusText.color = new Color(1f, 0.4f, 0.4f, 1f); }
                 });
             });
@@ -1256,6 +1261,98 @@ public class GameManager : MonoBehaviour
                 else
                 {
                     _leaderboardRows[i].text = "";
+                }
+            }
+        });
+    }
+
+    private void CreateDailyLeaderboardUI()
+    {
+        float rowHeight = 36f;
+        float padding = 16f;
+        float titleHeight = 44f;
+        float panelH = titleHeight + padding + LeaderboardDisplayCount * rowHeight + padding;
+        float panelW = 520f;
+
+        GameObject board = new GameObject("DailyLeaderboardPanel");
+        board.transform.SetParent(_startPanel.transform, false);
+        RectTransform boardRt = board.AddComponent<RectTransform>();
+        boardRt.anchorMin = new Vector2(0.5f, 0.5f);
+        boardRt.anchorMax = new Vector2(0.5f, 0.5f);
+        boardRt.pivot = new Vector2(0.5f, 0.5f);
+        boardRt.sizeDelta = new Vector2(panelW, panelH);
+        boardRt.anchoredPosition = new Vector2(-667f, 100f);
+        Image bg = board.AddComponent<Image>();
+        bg.color = new Color(0f, 0f, 0f, 0.88f);
+
+        GameObject titleGo = new GameObject("DailyLeaderboardTitle");
+        titleGo.transform.SetParent(board.transform, false);
+        RectTransform titleRt = titleGo.AddComponent<RectTransform>();
+        titleRt.anchorMin = new Vector2(0f, 1f);
+        titleRt.anchorMax = new Vector2(1f, 1f);
+        titleRt.pivot = new Vector2(0.5f, 1f);
+        titleRt.sizeDelta = new Vector2(0f, titleHeight);
+        titleRt.anchoredPosition = new Vector2(0f, 0f);
+        _dailyLeaderboardTitle = titleGo.AddComponent<LegacyText>();
+        _dailyLeaderboardTitle.text = "Today's Scores";
+        _dailyLeaderboardTitle.fontSize = 28;
+        _dailyLeaderboardTitle.color = new Color(1f, 0.85f, 0.2f, 1f);
+        _dailyLeaderboardTitle.alignment = TextAnchor.MiddleCenter;
+        _dailyLeaderboardTitle.fontStyle = FontStyle.Bold;
+        _dailyLeaderboardTitle.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+
+        _dailyLeaderboardRows = new LegacyText[LeaderboardDisplayCount];
+        for (int i = 0; i < LeaderboardDisplayCount; i++)
+        {
+            GameObject rowGo = new GameObject("Row" + i);
+            rowGo.transform.SetParent(board.transform, false);
+            RectTransform rowRt = rowGo.AddComponent<RectTransform>();
+            rowRt.anchorMin = new Vector2(0f, 1f);
+            rowRt.anchorMax = new Vector2(1f, 1f);
+            rowRt.pivot = new Vector2(0.5f, 1f);
+            rowRt.sizeDelta = new Vector2(0f, rowHeight);
+            rowRt.anchoredPosition = new Vector2(0f, -(titleHeight + padding + i * rowHeight));
+
+            LegacyText row = rowGo.AddComponent<LegacyText>();
+            row.text = "";
+            row.fontSize = 22;
+            row.color = Color.white;
+            row.alignment = TextAnchor.MiddleLeft;
+            row.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            rowRt.offsetMin = new Vector2(20f, rowRt.offsetMin.y);
+            rowRt.offsetMax = new Vector2(-20f, rowRt.offsetMax.y);
+            _dailyLeaderboardRows[i] = row;
+        }
+    }
+
+    private void RefreshDailyLeaderboard()
+    {
+        if (_dailyLeaderboardRows == null) return;
+        for (int i = 0; i < _dailyLeaderboardRows.Length; i++)
+            _dailyLeaderboardRows[i].text = i == 0 ? "Loading..." : "";
+
+        if (LeaderboardManager.Instance == null) return;
+        LeaderboardManager.Instance.GetDailyTopScores(LeaderboardDisplayCount, (items) =>
+        {
+            if (items == null || items.Length == 0)
+            {
+                _dailyLeaderboardRows[0].text = "No scores yet — be the first!";
+                for (int i = 1; i < _dailyLeaderboardRows.Length; i++)
+                    _dailyLeaderboardRows[i].text = "";
+                return;
+            }
+            for (int i = 0; i < _dailyLeaderboardRows.Length; i++)
+            {
+                if (i < items.Length)
+                {
+                    var entry = items[i];
+                    string name = (entry.player != null && !string.IsNullOrEmpty(entry.player.name))
+                        ? entry.player.name : "Unknown";
+                    _dailyLeaderboardRows[i].text = $"#{entry.rank}  {name}  —  {entry.score}";
+                }
+                else
+                {
+                    _dailyLeaderboardRows[i].text = "";
                 }
             }
         });

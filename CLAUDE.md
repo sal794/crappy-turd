@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Crappy Turd 2000** is a Unity 6 2D game project. Unity version: `6000.5.0f1`.
+**Crappy Turd 2000** is a Unity 6 2D endless-flapper game (think Flappy Bird). Unity version: `6000.5.0f1`.
 
 This is a Unity project — there are no CLI build commands to run from a terminal in normal development. All building, testing, and scene editing is done through the Unity Editor.
 
@@ -12,6 +12,7 @@ This is a Unity project — there are no CLI build commands to run from a termin
 
 - **Universal Render Pipeline (URP) 2D** (`17.5.0`) — 2D renderer with `Assets/Settings/Renderer2D.asset`
 - **New Input System** (`1.19.0`) — input actions defined in `Assets/InputSystem_Actions.inputactions`
+- **LootLocker SDK** — leaderboards and player accounts (White Label auth); config in `Assets/LootLockerSDK/`
 - **2D Toolset** — animation, Aseprite importer, PSD importer, sprite, spriteshape, tilemap + extras
 - **Visual Scripting** (`1.9.11`)
 - **Unity Test Framework** (`1.7.0`) — for edit-mode and play-mode tests
@@ -22,12 +23,37 @@ This is a Unity project — there are no CLI build commands to run from a termin
 
 ```
 Assets/
-  Scenes/           # Game scenes (SampleScene.unity is the default)
-  Settings/         # URP pipeline assets and render settings
+  Scripts/
+    GameManager.cs          # Singleton — game state, UI, audio, scoring, pause, settings
+    PlayerController.cs     # Flap physics, bounds checking, input (keyboard/touch/gamepad)
+    Obstacle.cs             # Moves left, awards score when passed, self-destructs offscreen
+    ObstacleSpawner.cs      # Timed spawn of top+bottom obstacle pairs; speeds up with score
+    ScrollingBackground.cs  # Two-panel seamless background scroll
+    LeaderboardManager.cs   # LootLocker session, guest names, accounts, score submit/fetch
+  ct2000.unity              # Main (active) game scene
+  Scenes/
+    SampleScene.unity       # Legacy/template scene — not used
+  Settings/                 # URP pipeline assets and render settings
+  LootLockerSDK/            # LootLocker package files
   InputSystem_Actions.inputactions  # Project-wide input action map
 ```
 
-Scripts should be added under `Assets/Scripts/` (does not exist yet — create it).
+## Architecture Notes
+
+- **GameManager** is a singleton (`GameManager.Instance`) that owns all runtime UI — it builds every panel (start, pause, game-over, settings, leaderboard, account) procedurally in code using Legacy `UnityEngine.UI.Text`. Do not add UGUI components in the scene for these panels; build them here.
+- **LeaderboardManager** is also a singleton (`DontDestroyOnLoad`). It starts a LootLocker guest session on boot and auto-logs in if saved credentials exist. Guest names are random adjective+noun combos (e.g. "StinkyTurd42").
+- **SpeedMultiplier** on `GameManager` increases by `0.01` per point scored. Both `Obstacle` and `ObstacleSpawner` read it to scale movement and spawn rate.
+- **UI style**: dark semi-transparent boxes (`new Color(0,0,0,0.92f)`) with white bold Legacy Text. Accent color is gold `(1f, 0.85f, 0.2f)`. Buttons use highlight/press color shifts. Keep new UI consistent with this.
+- **Input**: uses New Input System APIs directly (`Keyboard.current`, `Gamepad.current`, `Touchscreen.current`). Avoid legacy `Input.*`. `GameManager` detects Xbox vs PlayStation vs Touch vs Keyboard and shows context-appropriate hints.
+- **Audio**: two `AudioSource` components on `GameManager` — one for SFX (score sounds, game-over sounds), one for looping background music. Volumes are persisted via `PlayerPrefs` with keys `CT2000_MusicVolume` and `CT2000_SFXVolume`.
+
+## LootLocker Integration
+
+- Leaderboard key: `"ct2000_highscores"`
+- Auth: White Label — username + 4-digit PIN. Email is synthesized as `{sanitized_username}@play.ct2000.game`.
+- Guest players get a random name; the "New Name" button calls `LeaderboardManager.RegenerateName()`.
+- Scores are submitted on game-over via `LeaderboardManager.SubmitScore(score)`.
+- Top 8 scores are fetched and displayed on the start screen leaderboard panel.
 
 ## Unity-Specific Notes
 

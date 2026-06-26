@@ -8,6 +8,7 @@ public class LeaderboardManager : MonoBehaviour
     public static LeaderboardManager Instance { get; private set; }
 
     private const string LeaderboardKey = "ct2000_highscores";
+    private const string DailyLeaderboardKey = "ct2000_daily";
     private const string GuestNamePrefKey = "CT2000_PlayerName";
     private const string AccountEmailPrefKey = "CT2000_AccountEmail";
     private const string AccountPassPrefKey = "CT2000_AccountPass";
@@ -164,7 +165,11 @@ public class LeaderboardManager : MonoBehaviour
         LootLockerSDKManager.SubmitScore(null, score, LeaderboardKey, (response) =>
         {
             if (!response.success) Debug.LogWarning("Score submit failed: " + response.text);
-            onComplete?.Invoke();
+            LootLockerSDKManager.SubmitScore(null, score, DailyLeaderboardKey, (dailyResponse) =>
+            {
+                if (!dailyResponse.success) Debug.LogWarning("Daily score submit failed: " + dailyResponse.text);
+                onComplete?.Invoke();
+            });
         });
     }
 
@@ -172,6 +177,15 @@ public class LeaderboardManager : MonoBehaviour
     {
         if (!SessionActive) { onComplete?.Invoke(null); return; }
         LootLockerSDKManager.GetScoreList(LeaderboardKey, count, (response) =>
+        {
+            onComplete?.Invoke(response.success ? response.items : null);
+        });
+    }
+
+    public void GetDailyTopScores(int count, System.Action<LootLockerLeaderboardMember[]> onComplete)
+    {
+        if (!SessionActive) { onComplete?.Invoke(null); return; }
+        LootLockerSDKManager.GetScoreList(DailyLeaderboardKey, count, (response) =>
         {
             onComplete?.Invoke(response.success ? response.items : null);
         });

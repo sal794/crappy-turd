@@ -1,6 +1,6 @@
 {
   "dependencies": {
-    "com.coplaydev.coplay": "file:C:/Users/samlu/Downloads/coplay-unity-plugin-beta/coplay-unity-plugin-beta",
+    "com.coplaydev.coplay": "https://github.com/CoplayDev/coplay-unity-plugin.git#beta",
     "com.lootlocker.lootlockersdk": "git+https://github.com/LootLocker/unity-sdk.git#main",
     "com.unity.2d.animation": "15.1.0",
     "com.unity.2d.aseprite": "5.0.3",

@@ -1,13 +1,14 @@
 {
   "dependencies": {
     "com.coplaydev.coplay": {
-      "version": "file:C:/Users/samlu/Downloads/coplay-unity-plugin-beta/coplay-unity-plugin-beta",
+      "version": "https://github.com/CoplayDev/coplay-unity-plugin.git#beta",
       "depth": 0,
-      "source": "local",
+      "source": "git",
       "dependencies": {
         "com.unity.inputsystem": "1.1.1",
         "com.unity.cloud.gltfast": "6.12.1"
-      }
+      },
+      "hash": "377ff5d3e14e1a095c30be8ef8e1d4c57dd0e322"
     },
     "com.lootlocker.lootlockersdk": {
       "version": "git+https://github.com/LootLocker/unity-sdk.git#main",

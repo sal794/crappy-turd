@@ -160,6 +160,7 @@ MonoBehaviour:
   gameOverSounds:
   - {fileID: 8300000, guid: 41a486fd59fc05b49aa5b0867cb4b1b9, type: 3}
   - {fileID: 8300000, guid: bb5dce667f53ab64b8e6eb14d4ada6d0, type: 3}
+  backgroundMusic: {fileID: 0}
 --- !u!4 &22379542
 Transform:
   m_ObjectHideFlags: 0
