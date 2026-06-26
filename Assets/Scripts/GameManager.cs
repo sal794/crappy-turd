@@ -25,6 +25,10 @@ public class GameManager : MonoBehaviour
 
     private GameObject _startPanel;
     private GameObject _settingsPanel;
+    private GameObject _skinsPanel;
+    private Button[] _skinEquipButtons;
+    private LegacyText[] _skinStatusLabels;
+    private Image[] _skinCardBorders;
     private GameObject _pauseButton;
     private GameObject _pausePanel;
     private GameObject _accountPanel;
@@ -92,6 +96,11 @@ public class GameManager : MonoBehaviour
             LeaderboardManager.Instance.OnSessionReady += RefreshDailyLeaderboard;
             LeaderboardManager.Instance.OnSessionReady += () => SkinManager.Instance?.LoadUnlocksFromStorage();
             LeaderboardManager.Instance.OnAccountStateChanged += RefreshAccountUI;
+        }
+        if (SkinManager.Instance != null)
+        {
+            SkinManager.Instance.OnUnlockChanged += RefreshSkinsPanel;
+            SkinManager.Instance.OnSkinChanged += RefreshSkinsPanel;
         }
 
         _musicSource.volume = PlayerPrefs.GetFloat(MusicVolumePrefKey, 0.35f);
@@ -411,6 +420,8 @@ public class GameManager : MonoBehaviour
         CreateNamePickerUI();
         CreateSettingsButton();
         CreateSettingsPanel();
+        CreateSkinsButton();
+        CreateSkinsPanel();
         CreateAccountButton();
         CreateAccountPanel();
     }
@@ -511,8 +522,8 @@ public class GameManager : MonoBehaviour
         rt.anchorMin = new Vector2(0.5f, 0.5f);
         rt.anchorMax = new Vector2(0.5f, 0.5f);
         rt.pivot = new Vector2(0.5f, 0.5f);
-        rt.sizeDelta = new Vector2(260f, 60f);
-        rt.anchoredPosition = new Vector2(-150f, -455f);
+        rt.sizeDelta = new Vector2(220f, 60f);
+        rt.anchoredPosition = new Vector2(-320f, -455f);
 
         Image img = btnGo.AddComponent<Image>();
         img.color = new Color(0f, 0f, 0f, 0.92f);
@@ -807,6 +818,283 @@ public class GameManager : MonoBehaviour
         _settingsPanel.SetActive(false);
     }
 
+    private void CreateSkinsButton()
+    {
+        GameObject btnGo = new GameObject("SkinsButton");
+        btnGo.transform.SetParent(_startPanel.transform, false);
+        RectTransform rt = btnGo.AddComponent<RectTransform>();
+        rt.anchorMin = new Vector2(0.5f, 0.5f);
+        rt.anchorMax = new Vector2(0.5f, 0.5f);
+        rt.pivot = new Vector2(0.5f, 0.5f);
+        rt.sizeDelta = new Vector2(220f, 60f);
+        rt.anchoredPosition = new Vector2(0f, -455f);
+
+        Image img = btnGo.AddComponent<Image>();
+        img.color = new Color(0f, 0f, 0f, 0.92f);
+        Button btn = btnGo.AddComponent<Button>();
+        btn.targetGraphic = img;
+        ColorBlock colors = btn.colors;
+        colors.normalColor = Color.white;
+        colors.highlightedColor = new Color(0.85f, 0.85f, 0.85f, 1f);
+        colors.pressedColor = new Color(0.7f, 0.7f, 0.7f, 1f);
+        btn.colors = colors;
+        btn.onClick.AddListener(() => { RefreshSkinsPanel(); _skinsPanel.SetActive(true); });
+
+        GameObject textGo = new GameObject("Label");
+        textGo.transform.SetParent(btnGo.transform, false);
+        RectTransform textRt = textGo.AddComponent<RectTransform>();
+        textRt.anchorMin = Vector2.zero;
+        textRt.anchorMax = Vector2.one;
+        textRt.offsetMin = Vector2.zero;
+        textRt.offsetMax = Vector2.zero;
+        LegacyText txt = textGo.AddComponent<LegacyText>();
+        txt.text = "Skins";
+        txt.fontSize = 30;
+        txt.color = Color.white;
+        txt.fontStyle = FontStyle.Bold;
+        txt.alignment = TextAnchor.MiddleCenter;
+        txt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+    }
+
+    private void CreateSkinsPanel()
+    {
+        Canvas canvas = FindFirstObjectByType<Canvas>();
+        _skinsPanel = new GameObject("SkinsPanel");
+        _skinsPanel.transform.SetParent(canvas.transform, false);
+
+        RectTransform overlayRt = _skinsPanel.AddComponent<RectTransform>();
+        overlayRt.anchorMin = Vector2.zero;
+        overlayRt.anchorMax = Vector2.one;
+        overlayRt.offsetMin = Vector2.zero;
+        overlayRt.offsetMax = Vector2.zero;
+        Image overlayImg = _skinsPanel.AddComponent<Image>();
+        overlayImg.color = new Color(0f, 0f, 0f, 0.85f);
+
+        // Content box
+        GameObject box = new GameObject("Box");
+        box.transform.SetParent(_skinsPanel.transform, false);
+        RectTransform boxRt = box.AddComponent<RectTransform>();
+        boxRt.anchorMin = new Vector2(0.5f, 0.5f);
+        boxRt.anchorMax = new Vector2(0.5f, 0.5f);
+        boxRt.pivot = new Vector2(0.5f, 0.5f);
+        boxRt.sizeDelta = new Vector2(800f, 520f);
+        boxRt.anchoredPosition = Vector2.zero;
+        Image boxImg = box.AddComponent<Image>();
+        boxImg.color = new Color(0.1f, 0.1f, 0.1f, 1f);
+
+        // Title
+        GameObject titleGo = new GameObject("Title");
+        titleGo.transform.SetParent(box.transform, false);
+        RectTransform titleRt = titleGo.AddComponent<RectTransform>();
+        titleRt.anchorMin = new Vector2(0f, 1f);
+        titleRt.anchorMax = new Vector2(1f, 1f);
+        titleRt.pivot = new Vector2(0.5f, 1f);
+        titleRt.sizeDelta = new Vector2(0f, 70f);
+        titleRt.anchoredPosition = Vector2.zero;
+        LegacyText titleTxt = titleGo.AddComponent<LegacyText>();
+        titleTxt.text = "Skins";
+        titleTxt.fontSize = 44;
+        titleTxt.color = new Color(1f, 0.85f, 0.2f, 1f);
+        titleTxt.fontStyle = FontStyle.Bold;
+        titleTxt.alignment = TextAnchor.MiddleCenter;
+        titleTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+
+        // Build one card per skin
+        int skinCount = SkinManager.AllSkins.Length;
+        _skinEquipButtons = new Button[skinCount];
+        _skinStatusLabels = new LegacyText[skinCount];
+        _skinCardBorders = new Image[skinCount];
+
+        float cardW = 280f;
+        float cardH = 380f;
+        float spacing = 40f;
+        float totalW = skinCount * cardW + (skinCount - 1) * spacing;
+        float startX = -totalW / 2f + cardW / 2f;
+
+        for (int i = 0; i < skinCount; i++)
+        {
+            SkinManager.SkinDefinition skin = SkinManager.AllSkins[i];
+            float cardX = startX + i * (cardW + spacing);
+
+            // Card background
+            GameObject card = new GameObject("Card_" + skin.Id);
+            card.transform.SetParent(box.transform, false);
+            RectTransform cardRt = card.AddComponent<RectTransform>();
+            cardRt.anchorMin = new Vector2(0.5f, 0.5f);
+            cardRt.anchorMax = new Vector2(0.5f, 0.5f);
+            cardRt.pivot = new Vector2(0.5f, 0.5f);
+            cardRt.sizeDelta = new Vector2(cardW, cardH);
+            cardRt.anchoredPosition = new Vector2(cardX, -20f);
+            Image cardImg = card.AddComponent<Image>();
+            cardImg.color = new Color(0.18f, 0.18f, 0.18f, 1f);
+            _skinCardBorders[i] = cardImg;
+
+            // Sprite preview
+            Sprite spr = Resources.Load<Sprite>(skin.ResourcePath);
+            if (spr != null)
+            {
+                GameObject sprGo = new GameObject("Preview");
+                sprGo.transform.SetParent(card.transform, false);
+                RectTransform sprRt = sprGo.AddComponent<RectTransform>();
+                sprRt.anchorMin = new Vector2(0.5f, 1f);
+                sprRt.anchorMax = new Vector2(0.5f, 1f);
+                sprRt.pivot = new Vector2(0.5f, 1f);
+                sprRt.sizeDelta = new Vector2(160f, 200f);
+                sprRt.anchoredPosition = new Vector2(0f, -20f);
+                Image sprImg = sprGo.AddComponent<Image>();
+                sprImg.sprite = spr;
+                sprImg.preserveAspect = true;
+                sprImg.color = Color.white;
+            }
+
+            // Skin name
+            GameObject nameGo = new GameObject("Name");
+            nameGo.transform.SetParent(card.transform, false);
+            RectTransform nameRt = nameGo.AddComponent<RectTransform>();
+            nameRt.anchorMin = new Vector2(0f, 1f);
+            nameRt.anchorMax = new Vector2(1f, 1f);
+            nameRt.pivot = new Vector2(0.5f, 1f);
+            nameRt.sizeDelta = new Vector2(0f, 50f);
+            nameRt.anchoredPosition = new Vector2(0f, -235f);
+            LegacyText nameTxt = nameGo.AddComponent<LegacyText>();
+            nameTxt.text = skin.DisplayName;
+            nameTxt.fontSize = 28;
+            nameTxt.color = Color.white;
+            nameTxt.fontStyle = FontStyle.Bold;
+            nameTxt.alignment = TextAnchor.MiddleCenter;
+            nameTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+
+            // Status label (e.g. unlock hint for locked skins)
+            GameObject hintGo = new GameObject("Hint");
+            hintGo.transform.SetParent(card.transform, false);
+            RectTransform hintRt = hintGo.AddComponent<RectTransform>();
+            hintRt.anchorMin = new Vector2(0f, 1f);
+            hintRt.anchorMax = new Vector2(1f, 1f);
+            hintRt.pivot = new Vector2(0.5f, 1f);
+            hintRt.sizeDelta = new Vector2(0f, 36f);
+            hintRt.anchoredPosition = new Vector2(0f, -285f);
+            LegacyText hintTxt = hintGo.AddComponent<LegacyText>();
+            hintTxt.fontSize = 20;
+            hintTxt.color = new Color(0.7f, 0.7f, 0.7f, 1f);
+            hintTxt.alignment = TextAnchor.MiddleCenter;
+            hintTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            _skinStatusLabels[i] = hintTxt;
+
+            // Equip button
+            int capturedIndex = i;
+            string capturedId = skin.Id;
+            GameObject btnGo = new GameObject("EquipBtn");
+            btnGo.transform.SetParent(card.transform, false);
+            RectTransform btnRt = btnGo.AddComponent<RectTransform>();
+            btnRt.anchorMin = new Vector2(0.5f, 1f);
+            btnRt.anchorMax = new Vector2(0.5f, 1f);
+            btnRt.pivot = new Vector2(0.5f, 1f);
+            btnRt.sizeDelta = new Vector2(200f, 56f);
+            btnRt.anchoredPosition = new Vector2(0f, -326f);
+            Image btnImg = btnGo.AddComponent<Image>();
+            Button btn = btnGo.AddComponent<Button>();
+            btn.targetGraphic = btnImg;
+            btn.onClick.AddListener(() => { SkinManager.Instance?.SetActiveSkin(capturedId); RefreshSkinsPanel(); });
+            _skinEquipButtons[i] = btn;
+
+            GameObject btnLabel = new GameObject("Label");
+            btnLabel.transform.SetParent(btnGo.transform, false);
+            RectTransform btnLabelRt = btnLabel.AddComponent<RectTransform>();
+            btnLabelRt.anchorMin = Vector2.zero;
+            btnLabelRt.anchorMax = Vector2.one;
+            btnLabelRt.offsetMin = Vector2.zero;
+            btnLabelRt.offsetMax = Vector2.zero;
+            LegacyText btnTxt = btnLabel.AddComponent<LegacyText>();
+            btnTxt.fontSize = 26;
+            btnTxt.fontStyle = FontStyle.Bold;
+            btnTxt.alignment = TextAnchor.MiddleCenter;
+            btnTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            _skinStatusLabels[i] = btnTxt;
+        }
+
+        // Close button
+        GameObject closeGo = new GameObject("CloseBtn");
+        closeGo.transform.SetParent(box.transform, false);
+        RectTransform closeRt = closeGo.AddComponent<RectTransform>();
+        closeRt.anchorMin = new Vector2(0.5f, 0f);
+        closeRt.anchorMax = new Vector2(0.5f, 0f);
+        closeRt.pivot = new Vector2(0.5f, 0f);
+        closeRt.sizeDelta = new Vector2(200f, 56f);
+        closeRt.anchoredPosition = new Vector2(0f, 20f);
+        Image closeImg = closeGo.AddComponent<Image>();
+        closeImg.color = new Color(0.25f, 0.25f, 0.25f, 1f);
+        Button closeBtn = closeGo.AddComponent<Button>();
+        closeBtn.targetGraphic = closeImg;
+        ColorBlock cc = closeBtn.colors;
+        cc.normalColor = Color.white;
+        cc.highlightedColor = new Color(0.85f, 0.85f, 0.85f, 1f);
+        cc.pressedColor = new Color(0.6f, 0.6f, 0.6f, 1f);
+        closeBtn.colors = cc;
+        closeBtn.onClick.AddListener(() => _skinsPanel.SetActive(false));
+
+        GameObject closeLbl = new GameObject("Label");
+        closeLbl.transform.SetParent(closeGo.transform, false);
+        RectTransform closeLblRt = closeLbl.AddComponent<RectTransform>();
+        closeLblRt.anchorMin = Vector2.zero;
+        closeLblRt.anchorMax = Vector2.one;
+        closeLblRt.offsetMin = Vector2.zero;
+        closeLblRt.offsetMax = Vector2.zero;
+        LegacyText closeTxt = closeLbl.AddComponent<LegacyText>();
+        closeTxt.text = "Close";
+        closeTxt.fontSize = 28;
+        closeTxt.color = Color.white;
+        closeTxt.fontStyle = FontStyle.Bold;
+        closeTxt.alignment = TextAnchor.MiddleCenter;
+        closeTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+
+        _skinsPanel.SetActive(false);
+    }
+
+    private void RefreshSkinsPanel()
+    {
+        if (_skinEquipButtons == null) return;
+        string activeSkinId = SkinManager.Instance?.ActiveSkinId ?? "mr_crappy";
+
+        Color gold = new Color(1f, 0.85f, 0.2f, 1f);
+        Color darkBg = new Color(0.18f, 0.18f, 0.18f, 1f);
+
+        for (int i = 0; i < SkinManager.AllSkins.Length; i++)
+        {
+            if (i >= _skinEquipButtons.Length) break;
+            SkinManager.SkinDefinition skin = SkinManager.AllSkins[i];
+            bool unlocked = SkinManager.Instance?.IsUnlocked(skin.Id) ?? (skin.Id == "mr_crappy");
+            bool equipped = skin.Id == activeSkinId;
+
+            Button btn = _skinEquipButtons[i];
+            LegacyText lbl = _skinStatusLabels[i];
+            Image border = _skinCardBorders[i];
+
+            border.color = equipped ? new Color(0.25f, 0.22f, 0.05f, 1f) : darkBg;
+
+            if (equipped)
+            {
+                btn.interactable = false;
+                btn.GetComponent<Image>().color = gold;
+                lbl.text = "Equipped";
+                lbl.color = new Color(0.1f, 0.1f, 0.1f, 1f);
+            }
+            else if (unlocked)
+            {
+                btn.interactable = true;
+                btn.GetComponent<Image>().color = new Color(0.25f, 0.25f, 0.25f, 1f);
+                lbl.text = "Equip";
+                lbl.color = Color.white;
+            }
+            else
+            {
+                btn.interactable = false;
+                btn.GetComponent<Image>().color = new Color(0.15f, 0.15f, 0.15f, 1f);
+                lbl.text = "Score 20+ to unlock";
+                lbl.color = new Color(0.55f, 0.55f, 0.55f, 1f);
+            }
+        }
+    }
+
     private void CreateAccountButton()
     {
         GameObject btnGo = new GameObject("AccountButton");
@@ -815,8 +1103,8 @@ public class GameManager : MonoBehaviour
         rt.anchorMin = new Vector2(0.5f, 0.5f);
         rt.anchorMax = new Vector2(0.5f, 0.5f);
         rt.pivot = new Vector2(0.5f, 0.5f);
-        rt.sizeDelta = new Vector2(260f, 60f);
-        rt.anchoredPosition = new Vector2(150f, -455f);
+        rt.sizeDelta = new Vector2(220f, 60f);
+        rt.anchoredPosition = new Vector2(320f, -455f);
 
         Image img = btnGo.AddComponent<Image>();
         img.color = new Color(0f, 0f, 0f, 0.92f);
