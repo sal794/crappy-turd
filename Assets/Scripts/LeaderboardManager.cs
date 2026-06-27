@@ -63,7 +63,7 @@ public class LeaderboardManager : MonoBehaviour
             if (!response.success) { Debug.LogWarning("Guest session failed: " + response.text); return; }
             SessionActive = true;
             PlayerId = response.player_id.ToString();
-            OnSessionReady?.Invoke();
+            LootLockerSDKManager.SetPlayerName(PlayerName, (_) => OnSessionReady?.Invoke());
         });
     }
 
@@ -146,10 +146,12 @@ public class LeaderboardManager : MonoBehaviour
         PlayerPrefs.DeleteKey(AccountEmailPrefKey);
         PlayerPrefs.DeleteKey(AccountPassPrefKey);
         PlayerPrefs.DeleteKey(AccountDisplayNamePrefKey);
+        string newGuestName = GenerateRandomName();
+        PlayerPrefs.SetString(GuestNamePrefKey, newGuestName);
         PlayerPrefs.Save();
         SessionActive = false;
         IsGuest = true;
-        PlayerName = PlayerPrefs.GetString(GuestNamePrefKey);
+        PlayerName = newGuestName;
         OnAccountStateChanged?.Invoke();
         StartGuestSession();
     }
@@ -198,21 +200,12 @@ public class LeaderboardManager : MonoBehaviour
     public void RegenerateName(System.Action<string> onComplete = null)
     {
         if (!IsGuest) return;
-        if (!SessionActive)
-        {
-            PlayerName = GenerateRandomName();
-            PlayerPrefs.SetString(GuestNamePrefKey, PlayerName);
-            PlayerPrefs.Save();
-            onComplete?.Invoke(PlayerName);
-            return;
-        }
-        FindUniqueName(null, 10, (uniqueName) =>
-        {
-            PlayerName = uniqueName;
-            PlayerPrefs.SetString(GuestNamePrefKey, PlayerName);
-            PlayerPrefs.Save();
-            onComplete?.Invoke(PlayerName);
-        });
+        PlayerName = GenerateRandomName();
+        PlayerPrefs.SetString(GuestNamePrefKey, PlayerName);
+        PlayerPrefs.Save();
+        onComplete?.Invoke(PlayerName);
+        if (!SessionActive) return;
+        LootLockerSDKManager.SetPlayerName(PlayerName, (_) => { });
     }
 
     private void SaveAccountPrefs(string email, string password, string displayName)
@@ -221,18 +214,6 @@ public class LeaderboardManager : MonoBehaviour
         PlayerPrefs.SetString(AccountPassPrefKey, password);
         PlayerPrefs.SetString(AccountDisplayNamePrefKey, displayName);
         PlayerPrefs.Save();
-    }
-
-    private void FindUniqueName(string initialCandidate, int attemptsLeft, System.Action<string> onFound)
-    {
-        string candidate = initialCandidate ?? GenerateRandomName();
-        if (attemptsLeft <= 0) { onFound?.Invoke(candidate + Random.Range(100, 999)); return; }
-        LootLockerSDKManager.LookupPlayerNamesByPlayerNames(new[] { candidate }, (response) =>
-        {
-            bool taken = response.success && response.players != null && response.players.Length > 0;
-            if (taken) FindUniqueName(null, attemptsLeft - 1, onFound);
-            else onFound?.Invoke(candidate);
-        });
     }
 
     private string BuildEmail(string username) =>
