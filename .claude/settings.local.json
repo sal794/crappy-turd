@@ -25,7 +25,8 @@
       "PowerShell(Compress-Archive *)",
       "PowerShell(& \"C:\\Users\\samlu\\bin\\butler.exe\" *)",
       "Bash(git add *)",
-      "Bash(git commit -m ' *)"
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)"
     ]
   }
 }

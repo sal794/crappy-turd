@@ -51,12 +51,22 @@ public class GameManager : MonoBehaviour
     private LegacyText _dailyLeaderboardTitle;
     private LegacyText[] _dailyLeaderboardRows;
     private LegacyText _playerNameLabel;
+    private LegacyText _playerNameValueLabel;
+    private RectTransform _playerNameValueLabelRt;
     private AudioSource _audioSource;
     private AudioSource _musicSource;
     private Font _gameFont;
+    private Font _frukturFont;
 
     private const string MusicVolumePrefKey = "CT2000_MusicVolume";
     private const string SFXVolumePrefKey = "CT2000_SFXVolume";
+    private const string HeadstartPrefKey = "CT2000_Headstart";
+
+    private bool _headstartEnabled;
+    private Button _headstartToggleBtn;
+    private LegacyText _headstartToggleLbl;
+    public bool StartHintDismissed => _startHintDismissed;
+    private bool _startHintDismissed;
 
     private const int LeaderboardDisplayCount = 8;
 
@@ -103,7 +113,9 @@ public class GameManager : MonoBehaviour
     private void Start()
     {
         _gameFont = Resources.Load<Font>("Fonts/Nosifer-Regular");
+        _frukturFont = Resources.Load<Font>("Fonts/Fruktur-Regular");
         HighScore = PlayerPrefs.GetInt(HighScorePrefKey, 0);
+        _headstartEnabled = PlayerPrefs.GetInt(HeadstartPrefKey, 0) == 1;
         StyleGameOverUI();
 
         Transform btnT = gameOverPanel.transform.Find("RestartButton");
@@ -129,6 +141,7 @@ public class GameManager : MonoBehaviour
             LeaderboardManager.Instance.OnAccountStateChanged += RefreshAccountUI;
             LeaderboardManager.Instance.OnAccountStateChanged += FetchLootLockerHighScore;
             LeaderboardManager.Instance.OnAccountStateChanged += () => SkinManager.Instance?.LoadUnlocksFromStorage();
+            RefreshAccountUI();
         }
         if (SkinManager.Instance != null)
         {
@@ -163,7 +176,7 @@ public class GameManager : MonoBehaviour
         if (IsGameOver && _restartHintLabel != null)
             _restartHintLabel.text = GetRestartHint();
 
-        if (!IsStarted && _startSubtitleLabel != null)
+        if (!IsStarted && !_startHintDismissed && _startSubtitleLabel != null)
             _startSubtitleLabel.text = GetStartHint();
     }
 
@@ -191,10 +204,10 @@ public class GameManager : MonoBehaviour
     {
         return _lastInputDevice switch
         {
-            InputDevice.PlayStation => "Press Cross to Start Crappin",
-            InputDevice.Xbox => "Press A to Start Crappin",
-            InputDevice.Touch => "Tap to Start Crappin",
-            _ => "Press Space to Start Crappin",
+            InputDevice.PlayStation => "Press Cross to Start Crappin'",
+            InputDevice.Xbox => "Press A to Start Crappin'",
+            InputDevice.Touch => "Tap to Start Crappin'",
+            _ => "Press Space to Start Crappin'",
         };
     }
 
@@ -209,11 +222,27 @@ public class GameManager : MonoBehaviour
         };
     }
 
+    public void DismissStartHint()
+    {
+        _startHintDismissed = true;
+        if (_startSubtitleLabel != null)
+            _startSubtitleLabel.transform.parent.parent.gameObject.SetActive(false);
+    }
+
     public void StartGame()
     {
         IsStarted = true;
         _startPanel.SetActive(false);
         if (_settingsPanel != null) _settingsPanel.SetActive(false);
+
+
+        if (_headstartEnabled && HighScore >= 2)
+        {
+            Score = HighScore / 2;
+            SpeedMultiplier = 1f + Score * 0.01f;
+            _scoreLabel.text = $"Current Score: {Score}";
+        }
+
         _scoreLabel.gameObject.SetActive(true);
         _highScoreLabel.gameObject.SetActive(true);
         if (_pauseButton != null) _pauseButton.SetActive(true);
@@ -230,6 +259,11 @@ public class GameManager : MonoBehaviour
                 PlayerPrefs.Save();
                 if (_highScoreLabel != null)
                     _highScoreLabel.text = $"High Score: {HighScore}";
+                if (_headstartToggleBtn != null)
+                {
+                    _headstartToggleBtn.transform.parent.gameObject.SetActive(HighScore >= 2);
+                    UpdateHeadstartToggleLabel();
+                }
             }
         });
     }
@@ -246,6 +280,11 @@ public class GameManager : MonoBehaviour
             PlayerPrefs.SetInt(HighScorePrefKey, HighScore);
             PlayerPrefs.Save();
             _highScoreLabel.text = $"High Score: {HighScore}";
+            if (_headstartToggleBtn != null)
+            {
+                _headstartToggleBtn.transform.parent.gameObject.SetActive(HighScore >= 2);
+                UpdateHeadstartToggleLabel();
+            }
         }
         SkinManager.Instance?.CheckScoreUnlock(Score);
         PlayRandomScoreSound();
@@ -433,17 +472,23 @@ public class GameManager : MonoBehaviour
         panelRt.offsetMax = Vector2.zero;
 
         CreateTitleImage();
-        _startSubtitleLabel = MakeLabel(_startPanel.transform, "SubtitleText", GetStartHint(), 36, new Vector2(0f, -365f), new Vector2(900f, 80f));
+        _startSubtitleLabel = MakeLabel(_startPanel.transform, "SubtitleText", GetStartHint(), 52, new Vector2(0f, -100f), new Vector2(1300f, 110f));
+        _startSubtitleLabel.horizontalOverflow = HorizontalWrapMode.Overflow;
 
         CreateLeaderboardUI();
         CreateDailyLeaderboardUI();
         CreateNamePickerUI();
         CreateSettingsButton();
         CreateSettingsPanel();
+        CreateHeadstartToggle();
         CreateSkinsButton();
         CreateSkinsPanel();
         CreateAccountButton();
         CreateAccountPanel();
+
+        // Ensure the start hint renders on top of leaderboards and other elements
+        if (_startSubtitleLabel != null)
+            _startSubtitleLabel.transform.parent.parent.SetAsLastSibling();
     }
 
     private void CreateNamePickerUI()
@@ -473,22 +518,42 @@ public class GameManager : MonoBehaviour
         Image bg = row.AddComponent<Image>();
         bg.color = BtnMagenta;
 
-        // "Playing as: Name" — left 68%
+        // "Playing as:" label — Nosifer, fixed left portion
         GameObject labelGo = new GameObject("NameLabel");
         labelGo.transform.SetParent(row.transform, false);
         _playerNameLabelRt = labelGo.AddComponent<RectTransform>();
         _playerNameLabelRt.anchorMin = new Vector2(0f, 0f);
-        _playerNameLabelRt.anchorMax = new Vector2(0.68f, 1f);
+        _playerNameLabelRt.anchorMax = new Vector2(0.4f, 1f);
         _playerNameLabelRt.offsetMin = new Vector2(20f, 0f);
         _playerNameLabelRt.offsetMax = Vector2.zero;
         _playerNameLabel = labelGo.AddComponent<LegacyText>();
-        _playerNameLabel.text = "Playing as: " + currentName;
+        _playerNameLabel.text = "Playing as:";
         _playerNameLabel.fontSize = 32;
         _playerNameLabel.color = new Color(0.92f, 0.65f, 0.25f);
         _playerNameLabel.fontStyle = FontStyle.Bold;
         _playerNameLabel.alignment = TextAnchor.MiddleLeft;
-        _playerNameLabel.font = GetGameFont();
+        _playerNameLabel.font = _gameFont != null ? _gameFont : Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
         _playerNameLabel.resizeTextForBestFit = false;
+
+        // Player name value — Fruktur
+        GameObject nameValGo = new GameObject("NameValue");
+        nameValGo.transform.SetParent(row.transform, false);
+        _playerNameValueLabelRt = nameValGo.AddComponent<RectTransform>();
+        _playerNameValueLabelRt.anchorMin = new Vector2(0.4f, 0f);
+        _playerNameValueLabelRt.anchorMax = new Vector2(0.68f, 1f);
+        _playerNameValueLabelRt.offsetMin = Vector2.zero;
+        _playerNameValueLabelRt.offsetMax = Vector2.zero;
+        _playerNameValueLabel = nameValGo.AddComponent<LegacyText>();
+        _playerNameValueLabel.text = currentName;
+        _playerNameValueLabel.fontSize = 32;
+        _playerNameValueLabel.color = new Color(0.92f, 0.65f, 0.25f);
+        _playerNameValueLabel.fontStyle = FontStyle.Bold;
+        _playerNameValueLabel.alignment = TextAnchor.MiddleLeft;
+        _playerNameValueLabel.font = _frukturFont != null ? _frukturFont : Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        _playerNameValueLabel.resizeTextForBestFit = false;
+        Outline nameValOutline = nameValGo.AddComponent<Outline>();
+        nameValOutline.effectColor    = new Color(0f, 0f, 0f, 1f);
+        nameValOutline.effectDistance = new Vector2(2f, -2f);
         Outline nameOutline = labelGo.AddComponent<Outline>();
         nameOutline.effectColor    = new Color(0f, 0f, 0f, 0.6f);
         nameOutline.effectDistance = new Vector2(2f, -2f);
@@ -527,8 +592,8 @@ public class GameManager : MonoBehaviour
             if (LeaderboardManager.Instance == null) return;
             LeaderboardManager.Instance.RegenerateName((newName) =>
             {
-                if (_playerNameLabel != null)
-                    _playerNameLabel.text = "Playing as: " + newName;
+                if (_playerNameValueLabel != null)
+                    _playerNameValueLabel.text = newName;
             });
         });
 
@@ -551,9 +616,42 @@ public class GameManager : MonoBehaviour
         newNameOutline.effectDistance = new Vector2(2f, -2f);
     }
 
+    private void CreateHeadstartToggle()
+    {
+        _headstartToggleBtn = MakeFancyButton(_startPanel.transform, "Headstart",
+            new Vector2(0f, -365f), new Vector2(420f, 60f),
+            _headstartEnabled ? BtnGold : BtnGray,
+            _headstartEnabled ? BtnGoldBorder : BtnGrayBorder,
+            ToggleHeadstart, fontSize: 30);
+        _headstartToggleLbl = _headstartToggleBtn.transform.Find("Label")?.GetComponent<LegacyText>();
+        UpdateHeadstartToggleLabel();
+        _headstartToggleBtn.transform.parent.gameObject.SetActive(HighScore >= 2);
+    }
+
+    private void ToggleHeadstart()
+    {
+        _headstartEnabled = !_headstartEnabled;
+        PlayerPrefs.SetInt(HeadstartPrefKey, _headstartEnabled ? 1 : 0);
+        PlayerPrefs.Save();
+        Image face = _headstartToggleBtn.GetComponent<Image>();
+        Image border = _headstartToggleBtn.transform.parent?.GetComponent<Image>();
+        if (face != null) face.color = _headstartEnabled ? BtnGold : BtnGray;
+        if (border != null) border.color = _headstartEnabled ? BtnGoldBorder : BtnGrayBorder;
+        UpdateHeadstartToggleLabel();
+    }
+
+    private void UpdateHeadstartToggleLabel()
+    {
+        if (_headstartToggleLbl == null) return;
+        int headstart = HighScore / 2;
+        _headstartToggleLbl.text = _headstartEnabled
+            ? $"Headstart: ON  (start at {headstart})"
+            : "Headstart: OFF";
+    }
+
     private void CreateSettingsButton()
     {
-        MakeFancyButton(_startPanel.transform, "Settings", new Vector2(-320f, -455f),
+        MakeFancyButton(_startPanel.transform, "Settings", new Vector2(-320f, -460f),
             new Vector2(210f, 60f), BtnBlue, BtnBlueBorder,
             () => _settingsPanel.SetActive(true), fontSize: 30);
     }
@@ -802,7 +900,7 @@ public class GameManager : MonoBehaviour
 
     private void CreateSkinsButton()
     {
-        MakeFancyButton(_startPanel.transform, "Skins", new Vector2(0f, -455f),
+        MakeFancyButton(_startPanel.transform, "Skins", new Vector2(0f, -460f),
             new Vector2(210f, 60f), BtnPurple, BtnPurpleBorder,
             () => { RefreshSkinsPanel(); _skinsPanel.SetActive(true); }, fontSize: 30);
     }
@@ -1021,7 +1119,7 @@ public class GameManager : MonoBehaviour
 
     private void CreateAccountButton()
     {
-        Button btn = MakeFancyButton(_startPanel.transform, "Login", new Vector2(320f, -455f),
+        Button btn = MakeFancyButton(_startPanel.transform, "Login", new Vector2(320f, -460f),
             new Vector2(210f, 60f), BtnGreen, BtnGreenBorder,
             () => _accountPanel.SetActive(true), fontSize: 26);
         _accountButtonLabel = btn.transform.Find("Label")?.GetComponent<LegacyText>();
@@ -1240,9 +1338,14 @@ public class GameManager : MonoBehaviour
 
         if (_playerNameLabel != null)
         {
-            _playerNameLabel.text = "Playing as: " + name;
             _playerNameLabel.alignment = isGuest ? TextAnchor.MiddleLeft : TextAnchor.MiddleCenter;
             _playerNameLabel.SetAllDirty();
+        }
+        if (_playerNameValueLabel != null)
+        {
+            _playerNameValueLabel.text = name;
+            _playerNameValueLabel.alignment = isGuest ? TextAnchor.MiddleLeft : TextAnchor.MiddleCenter;
+            _playerNameValueLabel.SetAllDirty();
         }
         if (_newNameButton != null)
             _newNameButton.SetActive(isGuest);
@@ -1251,10 +1354,18 @@ public class GameManager : MonoBehaviour
         if (_playerNameLabelRt != null)
         {
             _playerNameLabelRt.anchorMin = new Vector2(0f, 0f);
-            _playerNameLabelRt.anchorMax = isGuest ? new Vector2(0.68f, 1f) : new Vector2(1f, 1f);
-            _playerNameLabelRt.offsetMin = isGuest ? new Vector2(20f, 0f) : Vector2.zero;
+            _playerNameLabelRt.anchorMax = isGuest ? new Vector2(0.4f, 1f) : new Vector2(0.4f, 1f);
+            _playerNameLabelRt.offsetMin = new Vector2(20f, 0f);
             _playerNameLabelRt.offsetMax = Vector2.zero;
             LayoutRebuilder.ForceRebuildLayoutImmediate(_playerNameLabelRt);
+        }
+        if (_playerNameValueLabelRt != null)
+        {
+            _playerNameValueLabelRt.anchorMin = new Vector2(0.4f, 0f);
+            _playerNameValueLabelRt.anchorMax = isGuest ? new Vector2(0.68f, 1f) : new Vector2(1f, 1f);
+            _playerNameValueLabelRt.offsetMin = Vector2.zero;
+            _playerNameValueLabelRt.offsetMax = Vector2.zero;
+            LayoutRebuilder.ForceRebuildLayoutImmediate(_playerNameValueLabelRt);
         }
         if (_accountButtonLabel != null)
             _accountButtonLabel.text = isGuest ? "Login" : "Account";

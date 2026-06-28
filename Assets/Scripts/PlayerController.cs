@@ -60,9 +60,14 @@ public class PlayerController : MonoBehaviour
         {
             if (!GameManager.Instance.IsStarted)
             {
-                _rb.gravityScale = _normalGravityScale;
-                GameManager.Instance.StartGame();
-                Jump();
+                if (!GameManager.Instance.StartHintDismissed)
+                    GameManager.Instance.DismissStartHint();
+                else
+                {
+                    _rb.gravityScale = _normalGravityScale;
+                    GameManager.Instance.StartGame();
+                    Jump();
+                }
             }
             else
             {
