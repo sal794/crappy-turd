@@ -79,7 +79,7 @@ public class LeaderboardManager : MonoBehaviour
                 PlayerName = PlayerPrefs.GetString(AccountDisplayNamePrefKey, "Player");
                 SessionActive = true;
                 PlayerId = sessionResp.player_id.ToString();
-                OnSessionReady?.Invoke();
+                LootLockerSDKManager.SetPlayerName(PlayerName, (_) => OnSessionReady?.Invoke());
             });
         });
     }

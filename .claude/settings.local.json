@@ -19,7 +19,13 @@
       "PowerShell(git *)",
       "PowerShell(git commit *)",
       "PowerShell(git push *)",
-      "PowerShell(git pull *)"
+      "PowerShell(git pull *)",
+      "PowerShell($env:PATH += \";C:\\\\Program Files\\\\Git\\\\bin;C:\\\\Program Files\\\\Git\\\\cmd\"; cd \"C:\\\\Projects\\\\Crappy Turd 2000\"; git status)",
+      "PowerShell($env:PATH += \";C:\\\\Program Files\\\\Git\\\\bin;C:\\\\Program Files\\\\Git\\\\cmd\"; cd \"C:\\\\Projects\\\\Crappy Turd 2000\"; git diff --stat)",
+      "PowerShell(Compress-Archive *)",
+      "PowerShell(& \"C:\\Users\\samlu\\bin\\butler.exe\" *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)"
     ]
   }
 }

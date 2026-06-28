@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using System.Collections;
 
 public class PlayerController : MonoBehaviour
 {
@@ -15,6 +16,8 @@ public class PlayerController : MonoBehaviour
     private float _bottomBound;
     private float _topBound;
     private float _normalGravityScale;
+    private bool _ghostHitUsed = false;
+    private bool _wasActive = false;
 
     private void Awake()
     {
@@ -67,7 +70,12 @@ public class PlayerController : MonoBehaviour
             }
         }
 
-        if (GameManager.Instance.IsStarted && !GameManager.Instance.IsGameOver)
+        bool nowActive = GameManager.Instance.IsStarted && !GameManager.Instance.IsGameOver;
+        if (nowActive && !_wasActive)
+            _ghostHitUsed = false;
+        _wasActive = nowActive;
+
+        if (nowActive)
             UpdateLean();
     }
 
@@ -114,6 +122,23 @@ public class PlayerController : MonoBehaviour
             SkinManager.Instance.OnSkinChanged -= ApplyActiveSkin;
     }
 
+    private static Texture2D CreateSoftCircleTexture()
+    {
+        const int size = 32;
+        float center = size / 2f;
+        Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                float t = 1f - Mathf.Clamp01(Vector2.Distance(new Vector2(x, y), new Vector2(center, center)) / center);
+                tex.SetPixel(x, y, new Color(1f, 1f, 1f, t * t));
+            }
+        }
+        tex.Apply();
+        return tex;
+    }
+
     private void ApplyActiveSkin()
     {
         if (_sr == null || SkinManager.Instance == null) return;
@@ -132,7 +157,68 @@ public class PlayerController : MonoBehaviour
 
     private void OnCollisionEnter2D(Collision2D collision)
     {
-        if (collision.gameObject.CompareTag("Obstacle"))
-            GameManager.Instance.TriggerGameOver();
+        if (!collision.gameObject.CompareTag("Obstacle")) return;
+
+        if (!_ghostHitUsed && SkinManager.Instance?.ActiveSkinId == "the_dook")
+        {
+            _ghostHitUsed = true;
+            StartCoroutine(GhostHit());
+            return;
+        }
+
+        GameManager.Instance.TriggerGameOver();
+    }
+
+    private IEnumerator GhostHit()
+    {
+        Collider2D col = GetComponent<Collider2D>();
+        col.isTrigger = true;
+
+        GameObject psGo = new GameObject("GhostParticles");
+        psGo.transform.SetParent(transform, false);
+        psGo.transform.localPosition = Vector3.zero;
+        ParticleSystem ps = psGo.AddComponent<ParticleSystem>();
+
+        var psr = ps.GetComponent<ParticleSystemRenderer>();
+        var mat = new Material(Shader.Find("Sprites/Default"));
+        mat.mainTexture = CreateSoftCircleTexture();
+        psr.material = mat;
+        psr.sortingLayerName = _sr.sortingLayerName;
+        psr.sortingOrder = _sr.sortingOrder - 1;
+
+        var main = ps.main;
+        main.duration = 1.0f;
+        main.loop = false;
+        main.startLifetime = 0.5f;
+        main.startSpeed = new ParticleSystem.MinMaxCurve(0.3f, 0.8f);
+        main.startSize = new ParticleSystem.MinMaxCurve(0.3f, 0.7f);
+        main.startColor = new Color(1f, 1f, 1f, 1f);
+        main.maxParticles = 40;
+        main.simulationSpace = ParticleSystemSimulationSpace.World;
+
+        var emission = ps.emission;
+        emission.rateOverTime = 60f;
+
+        var shape = ps.shape;
+        shape.shapeType = ParticleSystemShapeType.Circle;
+        shape.radius = 0.25f;
+
+        var colorOverLifetime = ps.colorOverLifetime;
+        colorOverLifetime.enabled = false;
+
+        ps.Play();
+
+        float elapsed = 0f;
+        while (elapsed < 1.0f)
+        {
+            float alpha = Mathf.Lerp(0.15f, 0.6f, (Mathf.Sin(elapsed * 20f) + 1f) * 0.5f);
+            _sr.color = new Color(1f, 1f, 1f, alpha);
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        _sr.color = Color.white;
+        col.isTrigger = false;
+        Destroy(psGo, 0.5f);
     }
 }

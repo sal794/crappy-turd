@@ -9,19 +9,21 @@ public class SkinManager : MonoBehaviour
 
     private const string ActiveSkinPrefKey = "CT2000_ActiveSkin";
     private const string UnlockedSkinsPrefKey = "CT2000_UnlockedSkins";
-    private const int ScoreUnlockThreshold = 20;
 
     public class SkinDefinition
     {
         public string Id;
         public string DisplayName;
         public string ResourcePath; // relative to Resources/
+        public int UnlockScore;     // 0 = always unlocked
+        public string PowerDescription;
     }
 
     public static readonly SkinDefinition[] AllSkins =
     {
-        new SkinDefinition { Id = "mr_crappy",  DisplayName = "Mr. Crappy",  ResourcePath = "Skins/turd2000"     },
-        new SkinDefinition { Id = "the_kernel", DisplayName = "The Kernel",  ResourcePath = "Skins/goldturd2000" },
+        new SkinDefinition { Id = "mr_crappy",  DisplayName = "Mr. Crappy", ResourcePath = "Skins/turd2000",     UnlockScore = 0,  PowerDescription = "Your basic turd"  },
+        new SkinDefinition { Id = "the_kernel", DisplayName = "The Kernel", ResourcePath = "Skins/goldturd2000", UnlockScore = 20, PowerDescription = "Now with Corn"     },
+        new SkinDefinition { Id = "the_dook",   DisplayName = "The Dook",   ResourcePath = "Skins/turdhat2000",  UnlockScore = 50, PowerDescription = "One Free Pass"     },
     };
 
     private readonly HashSet<string> _unlocked = new HashSet<string> { "mr_crappy" };
@@ -49,20 +51,20 @@ public class SkinManager : MonoBehaviour
 
     public void LoadUnlocksFromStorage()
     {
-        LootLockerSDKManager.GetEntirePersistentStorage((Action<LootLockerGetPersistentStorageResponseDictionary>) ((response) =>
+        LootLockerSDKManager.GetEntirePersistentStorage((response) =>
         {
             if (!response.success || response.payload == null) return;
             bool changed = false;
-            foreach (var kvp in response.payload)
+            foreach (var item in response.payload)
             {
-                if (kvp.Key.StartsWith("skin_") && kvp.Value == "true")
+                if (item.key.StartsWith("skin_") && item.value == "true")
                 {
-                    string id = kvp.Key.Substring(5);
+                    string id = item.key.Substring(5);
                     if (_unlocked.Add(id)) changed = true;
                 }
             }
             if (changed) OnUnlockChanged?.Invoke();
-        }));
+        });
     }
 
     public bool IsUnlocked(string skinId) => skinId == "mr_crappy" || _unlocked.Contains(skinId);
@@ -98,8 +100,9 @@ public class SkinManager : MonoBehaviour
 
     public void CheckScoreUnlock(int score)
     {
-        if (score > ScoreUnlockThreshold && !IsUnlocked("the_kernel"))
-            Unlock("the_kernel");
+        foreach (var skin in AllSkins)
+            if (skin.UnlockScore > 0 && score >= skin.UnlockScore && !IsUnlocked(skin.Id))
+                Unlock(skin.Id);
     }
 
     public Sprite LoadActiveSkinSprite()

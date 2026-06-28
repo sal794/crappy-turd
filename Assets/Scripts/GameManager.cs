@@ -98,7 +98,7 @@ public class GameManager : MonoBehaviour
     }
 
     private Font GetGameFont() =>
-        _gameFont != null ? _gameFont : GetGameFont();
+        _gameFont != null ? _gameFont : Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
 
     private void Start()
     {
@@ -128,6 +128,7 @@ public class GameManager : MonoBehaviour
             LeaderboardManager.Instance.OnSessionReady += FetchLootLockerHighScore;
             LeaderboardManager.Instance.OnAccountStateChanged += RefreshAccountUI;
             LeaderboardManager.Instance.OnAccountStateChanged += FetchLootLockerHighScore;
+            LeaderboardManager.Instance.OnAccountStateChanged += () => SkinManager.Instance?.LoadUnlocksFromStorage();
         }
         if (SkinManager.Instance != null)
         {
@@ -827,7 +828,7 @@ public class GameManager : MonoBehaviour
         boxRt.anchorMin = new Vector2(0.5f, 0.5f);
         boxRt.anchorMax = new Vector2(0.5f, 0.5f);
         boxRt.pivot = new Vector2(0.5f, 0.5f);
-        boxRt.sizeDelta = new Vector2(800f, 580f);
+        boxRt.sizeDelta = new Vector2(800f, 660f);
         boxRt.anchoredPosition = Vector2.zero;
         Image boxImg = box.AddComponent<Image>();
         boxImg.color = new Color(0.1f, 0.1f, 0.1f, 1f);
@@ -856,7 +857,7 @@ public class GameManager : MonoBehaviour
         _skinCardBorders = new Image[skinCount];
 
         float cardW = 280f;
-        float cardH = 380f;
+        float cardH = 420f;
         float spacing = 40f;
         float totalW = skinCount * cardW + (skinCount - 1) * spacing;
         float startX = -totalW / 2f + cardW / 2f;
@@ -879,6 +880,23 @@ public class GameManager : MonoBehaviour
             cardImg.color = new Color(0.18f, 0.18f, 0.18f, 1f);
             _skinCardBorders[i] = cardImg;
 
+            // Power description — top of card
+            GameObject descGo = new GameObject("Desc");
+            descGo.transform.SetParent(card.transform, false);
+            RectTransform descRt = descGo.AddComponent<RectTransform>();
+            descRt.anchorMin = new Vector2(0f, 1f);
+            descRt.anchorMax = new Vector2(1f, 1f);
+            descRt.pivot = new Vector2(0.5f, 1f);
+            descRt.sizeDelta = new Vector2(0f, 40f);
+            descRt.anchoredPosition = new Vector2(0f, -8f);
+            LegacyText descTxt = descGo.AddComponent<LegacyText>();
+            descTxt.text = skin.PowerDescription;
+            descTxt.fontSize = 24;
+            descTxt.fontStyle = FontStyle.Italic;
+            descTxt.color = new Color(0.6f, 0.85f, 1f, 1f);
+            descTxt.alignment = TextAnchor.MiddleCenter;
+            descTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+
             // Sprite preview
             Sprite spr = Resources.Load<Sprite>(skin.ResourcePath);
             if (spr != null)
@@ -889,8 +907,8 @@ public class GameManager : MonoBehaviour
                 sprRt.anchorMin = new Vector2(0.5f, 1f);
                 sprRt.anchorMax = new Vector2(0.5f, 1f);
                 sprRt.pivot = new Vector2(0.5f, 1f);
-                sprRt.sizeDelta = new Vector2(160f, 200f);
-                sprRt.anchoredPosition = new Vector2(0f, -20f);
+                sprRt.sizeDelta = new Vector2(160f, 190f);
+                sprRt.anchoredPosition = new Vector2(0f, -55f);
                 Image sprImg = sprGo.AddComponent<Image>();
                 sprImg.sprite = spr;
                 sprImg.preserveAspect = true;
@@ -904,8 +922,8 @@ public class GameManager : MonoBehaviour
             nameRt.anchorMin = new Vector2(0f, 1f);
             nameRt.anchorMax = new Vector2(1f, 1f);
             nameRt.pivot = new Vector2(0.5f, 1f);
-            nameRt.sizeDelta = new Vector2(0f, 50f);
-            nameRt.anchoredPosition = new Vector2(0f, -235f);
+            nameRt.sizeDelta = new Vector2(0f, 60f);
+            nameRt.anchoredPosition = new Vector2(0f, -252f);
             LegacyText nameTxt = nameGo.AddComponent<LegacyText>();
             nameTxt.text = skin.DisplayName;
             nameTxt.fontSize = 28;
@@ -922,23 +940,22 @@ public class GameManager : MonoBehaviour
             hintRt.anchorMax = new Vector2(1f, 1f);
             hintRt.pivot = new Vector2(0.5f, 1f);
             hintRt.sizeDelta = new Vector2(0f, 36f);
-            hintRt.anchoredPosition = new Vector2(0f, -285f);
+            hintRt.anchoredPosition = new Vector2(0f, -318f);
             LegacyText hintTxt = hintGo.AddComponent<LegacyText>();
             hintTxt.fontSize = 20;
             hintTxt.color = new Color(0.7f, 0.7f, 0.7f, 1f);
             hintTxt.alignment = TextAnchor.MiddleCenter;
-            hintTxt.font = GetGameFont();
+            hintTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             _skinStatusLabels[i] = hintTxt;
 
             // Equip button
             string capturedId = skin.Id;
             Button btn = MakeFancyButton(card.transform, "Equip",
-                new Vector2(0f, -326f), new Vector2(190f, 50f),
+                new Vector2(0f, -360f), new Vector2(190f, 50f),
                 BtnGreen, BtnGreenBorder,
                 () => { SkinManager.Instance?.SetActiveSkin(capturedId); RefreshSkinsPanel(); },
                 new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), 24);
             _skinEquipButtons[i] = btn;
-            _skinStatusLabels[i] = btn.transform.Find("Label")?.GetComponent<LegacyText>();
         }
 
         // Close button
@@ -966,13 +983,13 @@ public class GameManager : MonoBehaviour
             bool equipped = skin.Id == activeSkinId;
 
             Button btn = _skinEquipButtons[i];
-            LegacyText lbl = _skinStatusLabels[i];
+            LegacyText hint = _skinStatusLabels[i];
+            LegacyText btnLbl = btn.transform.Find("Label")?.GetComponent<LegacyText>();
             Image border = _skinCardBorders[i];
 
             border.color = equipped ? new Color(0.25f, 0.22f, 0.05f, 1f) : darkBg;
 
             Image face = btn.GetComponent<Image>();
-            // Border sits on the parent of the face
             Image borderImg = btn.transform.parent != null ? btn.transform.parent.GetComponent<Image>() : null;
 
             if (equipped)
@@ -980,24 +997,24 @@ public class GameManager : MonoBehaviour
                 btn.interactable = false;
                 if (face != null) face.color = BtnGold;
                 if (borderImg != null) borderImg.color = BtnGoldBorder;
-                lbl.text = "Equipped";
-                lbl.color = Color.white;
+                if (btnLbl != null) { btnLbl.text = "Equipped"; btnLbl.color = Color.white; }
+                if (hint != null) hint.text = "";
             }
             else if (unlocked)
             {
                 btn.interactable = true;
                 if (face != null) face.color = BtnGreen;
                 if (borderImg != null) borderImg.color = BtnGreenBorder;
-                lbl.text = "Equip";
-                lbl.color = Color.white;
+                if (btnLbl != null) { btnLbl.text = "Equip"; btnLbl.color = Color.white; }
+                if (hint != null) hint.text = "";
             }
             else
             {
                 btn.interactable = false;
                 if (face != null) face.color = BtnGray;
                 if (borderImg != null) borderImg.color = BtnGrayBorder;
-                lbl.text = "Score 20+ to unlock";
-                lbl.color = new Color(0.75f, 0.75f, 0.75f, 1f);
+                if (btnLbl != null) { btnLbl.text = "Equip"; btnLbl.color = new Color(0.75f, 0.75f, 0.75f, 1f); }
+                if (hint != null) { hint.text = $"Score {skin.UnlockScore}+ to unlock"; hint.color = new Color(0.75f, 0.75f, 0.75f, 1f); }
             }
         }
     }
@@ -1640,7 +1657,7 @@ public class GameManager : MonoBehaviour
         hrt.anchoredPosition = new Vector2(-30f, -60f);
 
         _highScoreLabel = hgo.AddComponent<LegacyText>();
-        _highScoreLabel.text = "High Score: 0";
+        _highScoreLabel.text = $"High Score: {HighScore}";
         _highScoreLabel.fontSize = 36;
         _highScoreLabel.color = Color.white;
         _highScoreLabel.alignment = TextAnchor.UpperRight;

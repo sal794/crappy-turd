@@ -30,6 +30,7 @@ Assets/
     ObstacleSpawner.cs      # Timed spawn of top+bottom obstacle pairs; speeds up with score
     ScrollingBackground.cs  # Two-panel seamless background scroll
     LeaderboardManager.cs   # LootLocker session, guest names, accounts, score submit/fetch
+    SkinManager.cs          # Singleton — skin definitions, unlock tracking, active skin persistence
   ct2000.unity              # Main (active) game scene
   Scenes/
     SampleScene.unity       # Legacy/template scene — not used
@@ -42,6 +43,7 @@ Assets/
 
 - **GameManager** is a singleton (`GameManager.Instance`) that owns all runtime UI — it builds every panel (start, pause, game-over, settings, leaderboard, account) procedurally in code using Legacy `UnityEngine.UI.Text`. Do not add UGUI components in the scene for these panels; build them here.
 - **LeaderboardManager** is also a singleton (`DontDestroyOnLoad`). It starts a LootLocker guest session on boot and auto-logs in if saved credentials exist. Guest names are random adjective+noun combos (e.g. "StinkyTurd42").
+- **SkinManager** is a singleton (`DontDestroyOnLoad`). It defines all available skins, tracks unlocks in `PlayerPrefs` (with LootLocker persistent storage as the source of truth), and exposes `LoadActiveSkinSprite()` which uses `Resources.Load`. Skin sprites live in `Resources/Skins/`. `mr_crappy` is always unlocked; `the_kernel` unlocks at score > 20 via `CheckScoreUnlock(score)` called from `GameManager` on game-over.
 - **SpeedMultiplier** on `GameManager` increases by `0.01` per point scored. Both `Obstacle` and `ObstacleSpawner` read it to scale movement and spawn rate.
 - **UI style**: dark semi-transparent boxes (`new Color(0,0,0,0.92f)`) with white bold Legacy Text. Accent color is gold `(1f, 0.85f, 0.2f)`. Buttons use highlight/press color shifts. Keep new UI consistent with this.
 - **Input**: uses New Input System APIs directly (`Keyboard.current`, `Gamepad.current`, `Touchscreen.current`). Avoid legacy `Input.*`. `GameManager` detects Xbox vs PlayStation vs Touch vs Keyboard and shows context-appropriate hints.
@@ -49,11 +51,12 @@ Assets/
 
 ## LootLocker Integration
 
-- Leaderboard key: `"ct2000_highscores"`
-- Auth: White Label — username + 4-digit PIN. Email is synthesized as `{sanitized_username}@play.ct2000.game`.
+- Leaderboard keys: `"ct2000_highscores"` (all-time) and `"ct2000_daily"` (daily).
+- Auth: White Label — username + 4-digit PIN. Email is synthesized as `{sanitized_username}@play.ct2000.game`. Password is built as `"CT2K" + pin + "!Trd"`.
 - Guest players get a random name; the "New Name" button calls `LeaderboardManager.RegenerateName()`.
-- Scores are submitted on game-over via `LeaderboardManager.SubmitScore(score)`.
-- Top 8 scores are fetched and displayed on the start screen leaderboard panel.
+- Scores are submitted to both leaderboards on game-over via `LeaderboardManager.SubmitScore(score)`.
+- Top scores are fetched via `GetTopScores` (all-time) and `GetDailyTopScores` (daily) and displayed on the start screen.
+- Skin unlocks are persisted to LootLocker as key/value pairs with the pattern `skin_{skinId} = "true"` via `LootLockerSDKManager.UpdateOrCreateKeyValue`. They are re-loaded on session start via `SkinManager.LoadUnlocksFromStorage()`.
 
 ## Unity-Specific Notes
 
