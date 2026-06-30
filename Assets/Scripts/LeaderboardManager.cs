@@ -71,10 +71,20 @@ public class LeaderboardManager : MonoBehaviour
     {
         LootLockerSDKManager.WhiteLabelLogin(email, pass, true, (loginResp) =>
         {
-            if (!loginResp.success) { StartGuestSession(); return; }
-            LootLockerSDKManager.StartWhiteLabelSession((sessionResp) =>
+            if (!loginResp.success)
             {
-                if (!sessionResp.success) { StartGuestSession(); return; }
+                Debug.LogWarning("Auto-login failed, falling back to guest: " + loginResp.text);
+                ClearAccountPrefsAndStartGuest();
+                return;
+            }
+            LootLockerSDKManager.StartWhiteLabelSession(email, (sessionResp) =>
+            {
+                if (!sessionResp.success)
+                {
+                    Debug.LogWarning("White label session failed, falling back to guest: " + sessionResp.text);
+                    ClearAccountPrefsAndStartGuest();
+                    return;
+                }
                 IsGuest = false;
                 PlayerName = PlayerPrefs.GetString(AccountDisplayNamePrefKey, "Player");
                 SessionActive = true;
@@ -84,33 +94,29 @@ public class LeaderboardManager : MonoBehaviour
         });
     }
 
+    private void ClearAccountPrefsAndStartGuest()
+    {
+        // Wipe saved credentials so the guest session can never inherit the account display name.
+        // If credentials are genuinely bad the user will need to log in again manually.
+        PlayerPrefs.DeleteKey(AccountEmailPrefKey);
+        PlayerPrefs.DeleteKey(AccountPassPrefKey);
+        PlayerPrefs.DeleteKey(AccountDisplayNamePrefKey);
+        PlayerPrefs.Save();
+        StartGuestSession();
+    }
+
     public void CreateAccount(string username, string pin, System.Action<bool, string> onComplete)
     {
         string email = BuildEmail(username);
         string password = BuildPassword(pin);
 
-        LootLockerSDKManager.WhiteLabelSignUp(email, password, (signUpResp) =>
+        EndGuestSessionThen(() =>
         {
-            if (!signUpResp.success) { onComplete?.Invoke(false, signUpResp.text); return; }
-
-            LootLockerSDKManager.WhiteLabelLogin(email, password, true, (loginResp) =>
+            LootLockerSDKManager.WhiteLabelSignUp(email, password, (signUpResp) =>
             {
-                if (!loginResp.success) { onComplete?.Invoke(false, "Login failed after signup."); return; }
+                if (!signUpResp.success) { onComplete?.Invoke(false, signUpResp.text); return; }
 
-                LootLockerSDKManager.StartWhiteLabelSession((sessionResp) =>
-                {
-                    if (!sessionResp.success) { onComplete?.Invoke(false, "Session failed."); return; }
-
-                    IsGuest = false;
-                    PlayerName = username;
-                    SaveAccountPrefs(email, password, username);
-                    SessionActive = true;
-                    PlayerId = sessionResp.player_id.ToString();
-                    LootLockerSDKManager.SetPlayerName(username, (_) => { });
-                    OnAccountStateChanged?.Invoke();
-                    OnSessionReady?.Invoke();
-                    onComplete?.Invoke(true, "");
-                });
+                StartWhiteLabelLoginAndSession(email, password, username, onComplete);
             });
         });
     }
@@ -120,11 +126,31 @@ public class LeaderboardManager : MonoBehaviour
         string email = BuildEmail(username);
         string password = BuildPassword(pin);
 
+        EndGuestSessionThen(() => StartWhiteLabelLoginAndSession(email, password, username, onComplete));
+    }
+
+    // Ends the active guest session on LootLocker's servers before proceeding, so that WL login
+    // is not associated with the guest player context (which would create a new player UID).
+    private void EndGuestSessionThen(System.Action next)
+    {
+        if (IsGuest && SessionActive)
+        {
+            SessionActive = false;
+            LootLockerSDKManager.EndSession((_) => next(), true);
+        }
+        else
+        {
+            next();
+        }
+    }
+
+    private void StartWhiteLabelLoginAndSession(string email, string password, string username, System.Action<bool, string> onComplete)
+    {
         LootLockerSDKManager.WhiteLabelLogin(email, password, true, (loginResp) =>
         {
             if (!loginResp.success) { onComplete?.Invoke(false, "Wrong username or PIN. (" + loginResp.text + ")"); return; }
 
-            LootLockerSDKManager.StartWhiteLabelSession((sessionResp) =>
+            LootLockerSDKManager.StartWhiteLabelSession(email, (sessionResp) =>
             {
                 if (!sessionResp.success) { onComplete?.Invoke(false, "Session failed."); return; }
 
@@ -133,9 +159,8 @@ public class LeaderboardManager : MonoBehaviour
                 SaveAccountPrefs(email, password, username);
                 SessionActive = true;
                 PlayerId = sessionResp.player_id.ToString();
-                LootLockerSDKManager.SetPlayerName(username, (_) => { });
                 OnAccountStateChanged?.Invoke();
-                OnSessionReady?.Invoke();
+                LootLockerSDKManager.SetPlayerName(username, (_) => OnSessionReady?.Invoke());
                 onComplete?.Invoke(true, "");
             });
         });

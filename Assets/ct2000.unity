@@ -157,6 +157,8 @@ MonoBehaviour:
   - {fileID: 8300000, guid: 8eb3caeed3a0e4840a35dbabeeafd028, type: 3}
   - {fileID: 8300000, guid: 383388bce463ce1448970b0e75f4fe41, type: 3}
   - {fileID: 8300000, guid: f16395272daaddb40a82fad210238ef5, type: 3}
+  - {fileID: 8300000, guid: 32cc1abc995eac645ad7d701eb28df40, type: 3}
+  - {fileID: 8300000, guid: 4f9315a3f3e5dd34d939c952475e8ccb, type: 3}
   gameOverSounds:
   - {fileID: 8300000, guid: 41a486fd59fc05b49aa5b0867cb4b1b9, type: 3}
   - {fileID: 8300000, guid: bb5dce667f53ab64b8e6eb14d4ada6d0, type: 3}
