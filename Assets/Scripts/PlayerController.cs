@@ -11,7 +11,6 @@ public class PlayerController : MonoBehaviour
     [Header("Brown Baron (Hold-to-Fly)")]
     [SerializeField] private float baronClimbSpeed = 4f;
     [SerializeField] private float baronFallSpeed = 6f;
-    [SerializeField] private float baronAcceleration = 15f;
 
     private bool IsBrownBaron => SkinManager.Instance?.ActiveSkinId == "the_brown_baron";
 
@@ -125,10 +124,7 @@ public class PlayerController : MonoBehaviour
 
         if (GameManager.Instance.IsGameOver) return;
 
-        // Gravity stays at 0; velocity is driven entirely by hold state
-        float targetY = holding ? baronClimbSpeed : -baronFallSpeed;
-        _rb.linearVelocity = new Vector2(0f,
-            Mathf.MoveTowards(_rb.linearVelocity.y, targetY, baronAcceleration * Time.deltaTime));
+        _rb.linearVelocity = new Vector2(0f, holding ? baronClimbSpeed : -baronFallSpeed);
     }
 
     private void UpdateLean()
