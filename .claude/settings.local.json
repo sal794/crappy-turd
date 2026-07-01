@@ -26,7 +26,13 @@
       "PowerShell(& \"C:\\Users\\samlu\\bin\\butler.exe\" *)",
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "WebSearch",
+      "PowerShell(npm *)",
+      "PowerShell(winget *)",
+      "PowerShell(node --version)",
+      "PowerShell($nodePaths = @\\(\"$env:ProgramFiles\\\\nodejs\\\\node.exe\", \"$env:LOCALAPPDATA\\\\Programs\\\\nodejs\\\\node.exe\", \"C:\\\\Program Files\\\\nodejs\\\\node.exe\"\\); foreach \\($p in $nodePaths\\) { if \\(Test-Path $p\\) { Write-Output \"Found: $p\"; & $p --version } })",
+      "Bash(claude mcp *)"
     ]
   }
 }
