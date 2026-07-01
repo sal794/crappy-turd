@@ -25,6 +25,8 @@ public class SkinManager : MonoBehaviour
         new SkinDefinition { Id = "the_kernel",       DisplayName = "The Kernel",       ResourcePath = "Skins/goldturd2000",    UnlockScore = 20,  PowerDescription = "Now with Corn"       },
         new SkinDefinition { Id = "the_dook",         DisplayName = "The Dook",         ResourcePath = "Skins/turdhat2000",     UnlockScore = 50,  PowerDescription = "One Free Pass"       },
         new SkinDefinition { Id = "craptain_america", DisplayName = "Craptain America", ResourcePath = "Skins/craptainamerica", UnlockScore = 150, PowerDescription = "Shield Regenerates"  },
+        // TODO: set UnlockScore = 150 and remove from _unlocked default below when ready to ship
+        new SkinDefinition { Id = "the_brown_baron",  DisplayName = "The Brown Baron",  ResourcePath = "Skins/turd2000",        UnlockScore = 0,   PowerDescription = "Hold to Fly"         },
     };
 
     // Skins earned while in any guest session. Never cleared on logout so they can be migrated
@@ -32,7 +34,8 @@ public class SkinManager : MonoBehaviour
     private readonly HashSet<string> _guestUnlocked = new HashSet<string>();
 
     // Combined set of everything currently available (mr_crappy + guest + WL).
-    private readonly HashSet<string> _unlocked = new HashSet<string> { "mr_crappy" };
+    // TODO: remove "the_brown_baron" from this initializer when UnlockScore is set to 150
+    private readonly HashSet<string> _unlocked = new HashSet<string> { "mr_crappy", "the_brown_baron" };
 
     public string ActiveSkinId { get; private set; } = "mr_crappy";
 

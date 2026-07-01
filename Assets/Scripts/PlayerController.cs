@@ -8,6 +8,13 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private float maxLeanAngle = 25f;
     [SerializeField] private float leanSpeed = 8f;
 
+    [Header("Brown Baron (Hold-to-Fly)")]
+    [SerializeField] private float baronClimbSpeed = 4f;
+    [SerializeField] private float baronFallSpeed = 6f;
+    [SerializeField] private float baronAcceleration = 15f;
+
+    private bool IsBrownBaron => SkinManager.Instance?.ActiveSkinId == "the_brown_baron";
+
     private Rigidbody2D _rb;
     private SpriteRenderer _sr;
     private Vector3 _originalScale;
@@ -51,6 +58,22 @@ public class PlayerController : MonoBehaviour
     {
         if (GameManager.Instance == null) return;
 
+        if (IsBrownBaron)
+            UpdateBrownBaron();
+        else
+            UpdateFlapper();
+
+        bool nowActive = GameManager.Instance.IsStarted && !GameManager.Instance.IsGameOver;
+        if (nowActive && !_wasActive)
+            _ghostHitUsed = false;
+        _wasActive = nowActive;
+
+        if (nowActive)
+            UpdateLean();
+    }
+
+    private void UpdateFlapper()
+    {
         bool spacePressed = Keyboard.current != null && Keyboard.current.spaceKey.wasPressedThisFrame;
         bool tapped = Touchscreen.current != null && Touchscreen.current.primaryTouch.press.wasPressedThisFrame
             && !IsTouchOverUI(Touchscreen.current.primaryTouch.position.ReadValue());
@@ -74,14 +97,38 @@ public class PlayerController : MonoBehaviour
                 Jump();
             }
         }
+    }
 
-        bool nowActive = GameManager.Instance.IsStarted && !GameManager.Instance.IsGameOver;
-        if (nowActive && !_wasActive)
-            _ghostHitUsed = false;
-        _wasActive = nowActive;
+    private void UpdateBrownBaron()
+    {
+        bool startPressed = (Keyboard.current != null && Keyboard.current.spaceKey.wasPressedThisFrame) ||
+                            (Gamepad.current != null && Gamepad.current.buttonSouth.wasPressedThisFrame) ||
+                            (Touchscreen.current != null && Touchscreen.current.primaryTouch.press.wasPressedThisFrame
+                                && !IsTouchOverUI(Touchscreen.current.primaryTouch.position.ReadValue()));
 
-        if (nowActive)
-            UpdateLean();
+        bool holding = (Keyboard.current != null && Keyboard.current.spaceKey.isPressed) ||
+                       (Gamepad.current != null && Gamepad.current.buttonSouth.isPressed) ||
+                       (Touchscreen.current != null && Touchscreen.current.primaryTouch.press.isPressed
+                           && !IsTouchOverUI(Touchscreen.current.primaryTouch.position.ReadValue()));
+
+        if (!GameManager.Instance.IsStarted)
+        {
+            if (startPressed)
+            {
+                if (!GameManager.Instance.StartHintDismissed)
+                    GameManager.Instance.DismissStartHint();
+                else
+                    GameManager.Instance.StartGame();
+            }
+            return;
+        }
+
+        if (GameManager.Instance.IsGameOver) return;
+
+        // Gravity stays at 0; velocity is driven entirely by hold state
+        float targetY = holding ? baronClimbSpeed : -baronFallSpeed;
+        _rb.linearVelocity = new Vector2(0f,
+            Mathf.MoveTowards(_rb.linearVelocity.y, targetY, baronAcceleration * Time.deltaTime));
     }
 
     private void UpdateLean()
